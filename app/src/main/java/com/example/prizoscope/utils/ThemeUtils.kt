@@ -1,7 +1,6 @@
 package com.example.prizoscope.utils
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.appcompat.app.AppCompatDelegate
 
 object ThemeUtils {

@@ -32,8 +32,17 @@ class BookmarkFragment : Fragment() {
 
         bookmarkedItems.addAll(loadBookmarkedItems())
 
-        binding.bookmarksRecyclerView.layoutManager = LinearLayoutManager(requireContext())
-        binding.bookmarksRecyclerView.adapter = BookmarkAdapter(bookmarkedItems)
+        if (bookmarkedItems.isEmpty()) {
+            binding.noBookmarksMessage.visibility = View.VISIBLE
+            binding.bookmarksRecyclerView.visibility = View.GONE
+        } else {
+            binding.noBookmarksMessage.visibility = View.GONE
+            binding.bookmarksRecyclerView.apply {
+                layoutManager = LinearLayoutManager(requireContext())
+                adapter = BookmarkAdapter(bookmarkedItems)
+                visibility = View.VISIBLE
+            }
+        }
     }
 
     private fun loadBookmarkedItems(): List<Item> {

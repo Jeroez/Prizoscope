@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.prizoscope.R
 import com.example.prizoscope.data.repository.UserRepository
 import com.example.prizoscope.databinding.ActivityLoginBinding
 import com.example.prizoscope.ui.MainActivity
@@ -17,7 +16,6 @@ class Login : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize View Binding
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

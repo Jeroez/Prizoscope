@@ -3,7 +3,7 @@ package com.example.prizoscope.data.repository
 import android.content.Context
 import com.example.prizoscope.utils.DatabaseHelper
 
-class UserRepository(private val context: Context) {
+class UserRepository(context: Context) {
 
     private val dbHelper = DatabaseHelper(context)
 

@@ -1,6 +1,8 @@
 package com.example.prizoscope.ui
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.example.prizoscope.R
@@ -15,37 +17,56 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 class MainActivity : AppCompatActivity() {
 
     private lateinit var bottomNavigationView: BottomNavigationView
+    private lateinit var homeImageView: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Apply theme based on user preference
         ThemeUtils.applyTheme(this, isDarkModeEnabled())
 
         bottomNavigationView = findViewById(R.id.bottom_nav)
-        bottomNavigationView.setOnNavigationItemSelectedListener { menuItem ->
+        homeImageView = findViewById(R.id.home_image)
+
+        bottomNavigationView.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_camera -> loadFragment(CameraFragment())
-                R.id.nav_shopping -> loadFragment(ShoppingFragment())
-                R.id.nav_bookmarks -> loadFragment(BookmarkFragment())
-                R.id.nav_settings -> loadFragment(SettingsFragment())
-                R.id.nav_maps -> loadFragment(MapFragment())
+                R.id.nav_camera -> {
+                    updateUIForFragment(CameraFragment())
+                    true
+                }
+                R.id.nav_shopping -> {
+                    updateUIForFragment(ShoppingFragment())
+                    true
+                }
+                R.id.nav_bookmarks -> {
+                    updateUIForFragment(BookmarkFragment())
+                    true
+                }
+                R.id.nav_settings -> {
+                    updateUIForFragment(SettingsFragment())
+                    true
+                }
+                R.id.nav_maps -> {
+                    updateUIForFragment(MapFragment())
+                    true
+                }
                 else -> false
             }
         }
 
         if (savedInstanceState == null) {
-            loadFragment(CameraFragment())
+            updateUIForFragment(CameraFragment())
         }
     }
 
-    private fun loadFragment(fragment: Fragment): Boolean {
+
+    private fun updateUIForFragment(fragment: Fragment) {
+        homeImageView.visibility = View.INVISIBLE
         supportFragmentManager.beginTransaction()
             .replace(R.id.nav_host_fragment, fragment)
             .commit()
-        return true
     }
+
 
     private fun isDarkModeEnabled(): Boolean {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)

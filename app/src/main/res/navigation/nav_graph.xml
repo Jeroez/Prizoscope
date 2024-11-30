@@ -17,7 +17,7 @@
         tools:layout="@layout/fragment_settings" />
 
     <fragment
-        android:id="@+id/nav_map"
+        android:id="@+id/nav_maps"
         android:name="com.example.prizoscope.ui.maps.MapFragment"
         android:label="Map"
         tools:layout="@layout/fragment_map" />

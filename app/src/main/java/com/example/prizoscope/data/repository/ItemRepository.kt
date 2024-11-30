@@ -9,7 +9,7 @@ class ItemRepository(private val context: Context) {
     private val bookmarkedItems = mutableListOf<Item>()
 
     fun getAllItems(): List<Item> {
-        return items // Replace with actual database or API call
+        return items
     }
 
     fun bookmarkItem(item: Item) {

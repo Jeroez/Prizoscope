@@ -3,7 +3,6 @@ package com.example.prizoscope.ui
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import com.example.prizoscope.R
 import com.example.prizoscope.databinding.ActivityStartupBinding
 import com.example.prizoscope.ui.auth.Login
 import com.example.prizoscope.ui.auth.Signup

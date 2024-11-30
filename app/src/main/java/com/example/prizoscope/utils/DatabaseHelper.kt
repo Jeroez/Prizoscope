@@ -73,7 +73,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
             "SELECT * FROM users WHERE username = ? AND password = ?",
             arrayOf(username, password)
         )
-        val exists = cursor?.count ?: 0 > 0
+        val exists = (cursor?.count ?: 0) > 0
         cursor?.close()
         db.close()
         return exists

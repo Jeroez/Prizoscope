@@ -29,17 +29,14 @@ class ShoppingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Initialize ViewModel
         itemViewModel = ViewModelProvider(this)[ItemViewModel::class.java]
 
-        // Observe the items from ViewModel
         itemViewModel.items.observe(viewLifecycleOwner) { items ->
             if (items != null) {
                 setupRecyclerView(items)
             }
         }
 
-        // Load items
         itemViewModel.loadItems()
     }
 

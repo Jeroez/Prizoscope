@@ -8,31 +8,56 @@ import androidx.fragment.app.Fragment
 import com.example.prizoscope.R
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.OnMapReadyCallback
-import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
-    private lateinit var map: GoogleMap
+    private lateinit var mapView: MapView
+    private lateinit var googleMap: GoogleMap
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? = inflater.inflate(R.layout.fragment_map, container, false)
+    ): View {
+        return inflater.inflate(R.layout.fragment_map, container, false)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val mapFragment = childFragmentManager.findFragmentById(R.id.mapView) as SupportMapFragment
-        mapFragment.getMapAsync(this)
+
+        mapView = view.findViewById(R.id.mapView)
+        mapView.onCreate(savedInstanceState)
+        mapView.getMapAsync(this)
     }
 
-    override fun onMapReady(googleMap: GoogleMap) {
-        map = googleMap
+    override fun onMapReady(map: GoogleMap) {
+        googleMap = map
 
-        val location = LatLng(37.7749, -122.4194) // Replace with your desired location
-        map.addMarker(MarkerOptions().position(location).title("BTECH PC Customs"))
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15f))
+        val sampleLocation = LatLng(37.7749, -122.4194)
+        googleMap.addMarker(MarkerOptions().position(sampleLocation).title("Marker in San Francisco"))
+        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(sampleLocation, 15f))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        mapView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mapView.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mapView.onDestroy()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        mapView.onLowMemory()
     }
 }

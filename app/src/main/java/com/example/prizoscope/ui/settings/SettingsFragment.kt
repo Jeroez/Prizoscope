@@ -9,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.preference.PreferenceManager
-import com.example.prizoscope.R
 import com.example.prizoscope.databinding.FragmentSettingsBinding
 
 class SettingsFragment : Fragment() {
