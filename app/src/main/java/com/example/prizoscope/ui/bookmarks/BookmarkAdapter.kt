@@ -21,7 +21,7 @@ class BookmarkAdapter(private val items: List<Item>) : RecyclerView.Adapter<Book
 
     override fun onBindViewHolder(holder: BookmarkViewHolder, position: Int) {
         val item = items[position]
-        holder.title.text = item.title
+        holder.title.text = item.name
     }
 
     override fun getItemCount(): Int = items.size

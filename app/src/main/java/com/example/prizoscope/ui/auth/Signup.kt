@@ -3,7 +3,6 @@ package com.example.prizoscope.ui.auth
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.prizoscope.R
 import com.example.prizoscope.data.repository.UserRepository
 import com.example.prizoscope.databinding.ActivitySignupBinding
 

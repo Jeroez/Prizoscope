@@ -28,7 +28,7 @@ class Login : AppCompatActivity() {
             val password = binding.edtPassword.text.toString().trim()
 
             if (username.isNotEmpty() && password.isNotEmpty()) {
-                if (userRepository.loginUser(username, password)) {
+                if (userRepository.authenticate(username, password)) { // Updated method call
                     startActivity(Intent(this, MainActivity::class.java))
                     finish()
                 } else {

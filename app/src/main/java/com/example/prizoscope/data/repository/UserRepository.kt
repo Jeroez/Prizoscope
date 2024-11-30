@@ -14,4 +14,7 @@ class UserRepository(private val context: Context) {
     fun addUser(username: String, password: String) {
         dbHelper.addUser(username, password)
     }
+    fun registerUser(username: String, password: String): Boolean {
+        return dbHelper.addUser(username, password)
+    }
 }
