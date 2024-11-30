@@ -3,6 +3,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="aqua">#00FFFF</color>
+    <color name="green">#008000</color>
 
 <!--    Dark Theme-->
     <color name="main">#0A2540</color>
