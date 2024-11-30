@@ -1,19 +1,17 @@
 package com.example.prizoscope.ui.shopping
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.example.prizoscope.R
 import com.example.prizoscope.data.model.Item
-import kotlinx.android.synthetic.main.item_shopping.view.*
+import com.example.prizoscope.databinding.ItemShoppingBinding
 
 class ItemAdapter(private val items: List<Item>) :
     RecyclerView.Adapter<ItemAdapter.ItemViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_shopping, parent, false)
-        return ItemViewHolder(view)
+        val binding = ItemShoppingBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return ItemViewHolder(binding)
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
@@ -23,10 +21,10 @@ class ItemAdapter(private val items: List<Item>) :
 
     override fun getItemCount() = items.size
 
-    class ItemViewHolder(private val view: View) : RecyclerView.ViewHolder(view) {
+    class ItemViewHolder(private val binding: ItemShoppingBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: Item) {
-            view.itemName.text = item.name
-            view.itemPrice.text = "$${item.price}"
+            binding.itemName.text = item.name
+            binding.itemPrice.text = String.format("$%.2f", item.price)
         }
     }
 }

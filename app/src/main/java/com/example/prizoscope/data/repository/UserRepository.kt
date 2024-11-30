@@ -7,15 +7,11 @@ class UserRepository(private val context: Context) {
 
     private val dbHelper = DatabaseHelper(context)
 
-    fun registerUser(username: String, password: String): Boolean {
-        return dbHelper.addUser(username, password)
-    }
-
-    fun loginUser(username: String, password: String): Boolean {
+    fun authenticate(username: String, password: String): Boolean {
         return dbHelper.validateUser(username, password)
     }
 
-    fun getUserDetails(username: String): Map<String, String>? {
-        return dbHelper.getUserDetails(username)
+    fun addUser(username: String, password: String) {
+        dbHelper.addUser(username, password)
     }
 }

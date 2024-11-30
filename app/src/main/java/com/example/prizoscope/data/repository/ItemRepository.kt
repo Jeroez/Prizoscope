@@ -1,22 +1,24 @@
 package com.example.prizoscope.data.repository
 
 import android.content.Context
-import com.example.prizoscope.data.csv.CsvParser
 import com.example.prizoscope.data.model.Item
 
 class ItemRepository(private val context: Context) {
 
-    private val csvParser = CsvParser(context)
+    private val items = mutableListOf<Item>()
+    private val bookmarkedItems = mutableListOf<Item>()
 
-    fun getItems(): List<Item> {
-        return csvParser.parseCsv()
+    fun getAllItems(): List<Item> {
+        return items // Replace with actual database or API call
     }
 
-    fun searchItems(query: String): List<Item> {
-        return getItems().filter { it.name.contains(query, ignoreCase = true) }
+    fun bookmarkItem(item: Item) {
+        if (!bookmarkedItems.contains(item)) {
+            bookmarkedItems.add(item)
+        }
     }
 
-    fun getItemById(id: String): Item? {
-        return getItems().find { it.id == id }
+    fun getBookmarkedItems(): List<Item> {
+        return bookmarkedItems
     }
 }

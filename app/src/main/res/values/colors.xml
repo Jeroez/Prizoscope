@@ -2,8 +2,18 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="aqua">#00FFFF</color>
+
+<!--    Dark Theme-->
     <color name="main">#0A2540</color>
     <color name="side">#173A5E</color>
     <color name="button">#2979FF</color>
-    <color name="aqua">#00FFFF</color>
+    <color name="onButton">#2979FF</color>
+
+<!--    Light Theme-->
+    <color name="lightMain">#F0F4FF</color>
+    <color name="lightSide">#D9E6FF</color>
+    <color name="lightOnButton">#1658B8</color>
+
+
 </resources>

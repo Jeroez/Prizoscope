@@ -23,7 +23,7 @@ class MainActivity : AppCompatActivity() {
         // Apply theme based on user preference
         ThemeUtils.applyTheme(this, isDarkModeEnabled())
 
-        bottomNavigationView = findViewById(R.id.bottom_navigation)
+        bottomNavigationView = findViewById(R.id.bottom_nav)
         bottomNavigationView.setOnNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_camera -> loadFragment(CameraFragment())
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadFragment(fragment: Fragment): Boolean {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
+            .replace(R.id.nav_host_fragment, fragment)
             .commit()
         return true
     }

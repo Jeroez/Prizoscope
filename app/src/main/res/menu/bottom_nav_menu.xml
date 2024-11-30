@@ -8,7 +8,7 @@
         android:title="Settings" />
 
     <item
-        android:id="@+id/nav_map"
+        android:id="@+id/nav_maps"
         android:icon="@drawable/map"
         android:title="Map" />
 
