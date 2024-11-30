@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -41,9 +42,7 @@ android {
     }
 }
 
-
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -59,19 +58,15 @@ dependencies {
     implementation(libs.navigation.ui)
     implementation(libs.recyclerview)
     implementation(libs.room.runtime)
-    implementation(libs.room.compiler) //
+    kapt(libs.room.compiler)
     implementation(libs.moshi)
-    implementation(libs.moshi.codegen) //
+    kapt(libs.moshi.codegen)
     implementation(libs.camerax.core)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
     implementation(libs.maps)
-    implementation(libs.material)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
     implementation(libs.preference)
     implementation(libs.guava)
-
-
-
 }
