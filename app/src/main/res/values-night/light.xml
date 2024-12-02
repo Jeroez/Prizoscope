@@ -1,0 +1,8 @@
+<resources>
+    <style name="LightTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/lightMain</item>
+        <item name="colorPrimaryVariant">@color/lightSide</item>
+        <item name="colorOnPrimary">@color/lightOnButton</item>
+        <item name="android:windowBackground">@color/white</item>
+    </style>
+</resources>

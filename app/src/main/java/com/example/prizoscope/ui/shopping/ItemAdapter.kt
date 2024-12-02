@@ -6,8 +6,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.prizoscope.data.model.Item
 import com.example.prizoscope.databinding.ItemShoppingBinding
 
-class ItemAdapter(private val items: List<Item>) :
+class ItemAdapter(private var items: List<Item>) :
     RecyclerView.Adapter<ItemAdapter.ItemViewHolder>() {
+
+    fun updateData(newItems: List<Item>) {
+        items = newItems
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
         val binding = ItemShoppingBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -28,3 +33,4 @@ class ItemAdapter(private val items: List<Item>) :
         }
     }
 }
+

@@ -7,7 +7,7 @@ import com.example.prizoscope.databinding.ActivityStartupBinding
 import com.example.prizoscope.ui.auth.Login
 import com.example.prizoscope.ui.auth.Signup
 
-class StartupActivity : AppCompatActivity() {
+class Startup : AppCompatActivity() {
 
     private lateinit var binding: ActivityStartupBinding
 

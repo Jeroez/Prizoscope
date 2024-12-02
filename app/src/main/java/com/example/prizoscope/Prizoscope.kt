@@ -10,6 +10,8 @@ class PrizoscopeApp : Application() {
 
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val isDarkModeEnabled = prefs.getBoolean("dark_mode", false)
-        ThemeUtils.applyTheme(this, isDarkModeEnabled)
+
+        ThemeUtils.applyTheme(isDarkModeEnabled)
     }
 }
+
