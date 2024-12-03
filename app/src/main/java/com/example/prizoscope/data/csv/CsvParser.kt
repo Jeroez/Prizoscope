@@ -10,7 +10,7 @@ class CsvParser(private val context: Context) {
         val items = mutableListOf<Item>()
         val inputStream = context.assets.open("items.csv")
         BufferedReader(InputStreamReader(inputStream)).use { reader ->
-            reader.readLine() // Skip header
+            reader.readLine()
             reader.forEachLine { line ->
                 val columns = line.split(",")
                 if (columns.size == 6) {

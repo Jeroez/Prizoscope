@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     android:background="@color/main">
 
+    <!-- Preview Image -->
     <ImageView
         android:id="@+id/preview_image_view"
         android:layout_width="match_parent"
@@ -13,6 +14,24 @@
         android:scaleType="centerCrop"
         android:contentDescription="Camera Preview" />
 
+    <!-- Centered Price Tag Overlay -->
+    <TextView
+        android:id="@+id/price_text_view"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_gravity="center"
+        android:padding="16dp"
+        android:background="@drawable/pricetag"
+        android:textColor="@android:color/black"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:text="Price: $123" /> <!-- Example Text -->
+
+    <!-- Bottom Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="180dp"
@@ -45,6 +64,7 @@
             android:contentDescription="Take Picture" />
     </LinearLayout>
 
+    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"

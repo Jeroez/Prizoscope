@@ -10,7 +10,12 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.prizoscope.R
 import com.example.prizoscope.ui.Startup
+import com.example.prizoscope.ui.bookmarks.BookmarkActivity
+import com.example.prizoscope.ui.maps.MapActivity
+import com.example.prizoscope.ui.shopping.ShoppingActivity
+import com.example.prizoscope.ui.camera.CameraActivity
 import com.example.prizoscope.utils.ThemeUtils
+import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -19,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var notificationsSwitch: Switch
     private lateinit var resetButton: Button
     private lateinit var aboutButton: TextView
+    private lateinit var bottomNavigationView: BottomNavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +35,7 @@ class SettingsActivity : AppCompatActivity() {
         notificationsSwitch = findViewById(R.id.switch_notifications)
         resetButton = findViewById(R.id.reset_button)
         aboutButton = findViewById(R.id.about_button)
+        bottomNavigationView = findViewById(R.id.bottom_nav)
 
         val sharedPreferences: SharedPreferences =
             getSharedPreferences("app_prefs", MODE_PRIVATE)
@@ -76,5 +83,33 @@ class SettingsActivity : AppCompatActivity() {
                 .setPositiveButton("OK", null)
                 .show()
         }
+
+        setupBottomNav()
+    }
+
+    private fun setupBottomNav() {
+        bottomNavigationView.setOnItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_camera -> {
+                    startActivity(Intent(this, CameraActivity::class.java))
+                    true
+                }
+                R.id.nav_shopping -> {
+                    startActivity(Intent(this, ShoppingActivity::class.java))
+                    true
+                }
+                R.id.nav_bookmarks -> {
+                    startActivity(Intent(this, BookmarkActivity::class.java))
+                    true
+                }
+                R.id.nav_settings -> true
+                R.id.nav_maps -> {
+                    startActivity(Intent(this, MapActivity::class.java))
+                    true
+                }
+                else -> false
+            }
+        }
     }
 }
+
