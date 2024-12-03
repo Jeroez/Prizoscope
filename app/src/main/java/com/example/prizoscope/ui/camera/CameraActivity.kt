@@ -23,11 +23,11 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import kotlin.math.sqrt
+import android.view.View
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.maps.MapActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 import com.example.prizoscope.ui.settings.SettingsActivity
-import android.view.View
 
 class CameraActivity : AppCompatActivity() {
 
@@ -49,7 +49,7 @@ class CameraActivity : AppCompatActivity() {
         albumButton = findViewById(R.id.btn_album)
         captureButton = findViewById(R.id.btn_capture)
         previewImageView = findViewById(R.id.preview_image_view)
-        priceTextView = findViewById(R.id.price_text_view) // Added TextView for the price tag
+        priceTextView = findViewById(R.id.price_text_view)
         bottomNavigationView = findViewById(R.id.bottom_nav)
 
         setupLaunchers()
@@ -131,23 +131,19 @@ class CameraActivity : AppCompatActivity() {
             val reader = BufferedReader(InputStreamReader(csvInputStream))
             val queryProcessed = preprocessText(query)
 
-            // Define main terms (e.g., main technologies or product categories)
+            // Define main terms
             val mainTerms = setOf("monitor", "cpu", "gpu", "headphone", "headset", "ram", "hdd", "ssd", "keyboard", "mouse")
 
-            // Step 1: Identify main term in query
             val detectedMainTerm = mainTerms.find { queryProcessed.contains(it) }
+            val filteredRows = mutableListOf<List<String>>()
+            val allRows = mutableListOf<List<String>>()
 
-            val filteredRows = mutableListOf<List<String>>() // To store rows matching the main term
-            val allRows = mutableListOf<List<String>>() // To store all rows for fallback
-
-            // Step 2: Process CSV and filter rows based on main term
             reader.forEachLine { line ->
                 val columns = line.split(",").map { it.trim() }
                 if (columns.size >= 6) {
                     val itemName = preprocessText(columns[1])
                     allRows.add(columns)
 
-                    // If a main term is detected, filter rows containing it
                     if (detectedMainTerm != null && itemName.contains(detectedMainTerm)) {
                         filteredRows.add(columns)
                     }
@@ -155,58 +151,30 @@ class CameraActivity : AppCompatActivity() {
             }
             reader.close()
 
-            // Step 3: Search for the best match in filtered rows (if available), else fallback to all rows
             val searchSpace = if (filteredRows.isNotEmpty()) filteredRows else allRows
-
-            var bestMatchItem: String? = null
-            var highestMatchScore = 0.0
-            var itemPrice: String? = null
-            var itemUrl: String? = null
-
-            for (row in searchSpace) {
+            val bestMatch = searchSpace.maxByOrNull { row ->
                 val itemName = preprocessText(row[1])
-                val currentItemPrice = row[2]
-                val currentItemUrl = row[4]
-
-                // Calculate match score
-                var matchScore = calculateCosineSimilarity(queryProcessed, itemName)
-
-                // Boost score if the main term matches
-                if (detectedMainTerm != null && itemName.contains(detectedMainTerm)) {
-                    matchScore += 0.3 // Boost score by a fixed amount
-                }
-
-                // Update best match if current score is higher
-                if (matchScore > highestMatchScore && matchScore >= 0.7) { // Threshold
-                    highestMatchScore = matchScore
-                    bestMatchItem = "Name: ${row[1]}\nPrice: $currentItemPrice\nRating: ${row[3]}\nURL: $currentItemUrl"
-                    itemPrice = currentItemPrice
-                    itemUrl = currentItemUrl
-                }
+                calculateCosineSimilarity(queryProcessed, itemName)
             }
 
-            // Step 4: Display result or fallback message
-            if (bestMatchItem != null) {
-                Toast.makeText(this, bestMatchItem, Toast.LENGTH_LONG).show()
-                updatePriceText(itemPrice, itemUrl)
+            if (bestMatch != null) {
+                val price = bestMatch[2]
+                val url = bestMatch[4]
+                updatePriceText(price, url)
             } else {
-                Toast.makeText(this, "Item '$query' not found", Toast.LENGTH_LONG).show()
                 updatePriceText(null, null)
+                Toast.makeText(this, "No matching item found", Toast.LENGTH_LONG).show()
             }
 
         } catch (e: Exception) {
             Toast.makeText(this, "Error reading CSV: ${e.message}", Toast.LENGTH_LONG).show()
-            Log.e("searchInCSV", "Error: ${e.message}")
         }
     }
 
-    /**
-     * Preprocess text by removing extra spaces, punctuation, and irrelevant characters.
-     */
     private fun preprocessText(text: String): String {
         return text.lowercase()
-            .replace(Regex("[^a-z0-9 ]"), "") // Remove non-alphanumeric characters
-            .replace("\\s+".toRegex(), " ") // Normalize spaces
+            .replace(Regex("[^a-z0-9 ]"), "")
+            .replace("\\s+".toRegex(), " ")
             .trim()
     }
 
@@ -241,11 +209,9 @@ class CameraActivity : AppCompatActivity() {
                 }
             }
         } else {
-            priceTextView.text = ""
             priceTextView.visibility = View.GONE
         }
     }
-
 
     private fun setupBottomNav() {
         bottomNavigationView.setOnItemSelectedListener { menuItem ->

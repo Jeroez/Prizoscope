@@ -41,30 +41,9 @@ class BookmarkActivity : AppCompatActivity() {
     }
 
     private fun loadBookmarks() {
-        try {
-            val csvInputStream = assets.open("items.csv")
-            val reader = BufferedReader(InputStreamReader(csvInputStream))
-
-            reader.forEachLine { line ->
-                val columns = line.split(",")
-                if (columns.size == 5) {
-                    bookmarks.add(
-                        Item(
-                            id = columns[0].trim(),
-                            name = columns[1].trim(),
-                            price = columns[2].trim().toDouble(),
-                            imageLink = columns[3].trim(),
-                            ratings = columns[4].trim().toFloat(),
-                            purchaseLink = "https://example.com/item" // Use a default or CSV-specified link
-                        )
-                    )
-                }
-            }
-
-            reader.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString("bookmarks", "[]")
+        bookmarks.clear()
+        bookmarks.addAll(Item.fromJsonArray(bookmarkJson ?: "[]"))
     }
 
 
@@ -90,13 +69,13 @@ class BookmarkActivity : AppCompatActivity() {
                     finish()
                     true
                 }
-                R.id.nav_shopping -> true
-
-                R.id.nav_bookmarks -> {
+                R.id.nav_shopping -> {
                     startActivity(Intent(this, ShoppingActivity::class.java))
                     finish()
                     true
                 }
+
+                R.id.nav_bookmarks -> true
                 else -> false
             }
         }

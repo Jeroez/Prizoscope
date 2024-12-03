@@ -14,6 +14,7 @@ import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.maps.MapActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 import com.example.prizoscope.ui.camera.CameraActivity
+import com.example.prizoscope.utils.PreferencesManager
 import com.example.prizoscope.utils.ThemeUtils
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
@@ -41,12 +42,11 @@ class SettingsActivity : AppCompatActivity() {
             getSharedPreferences("app_prefs", MODE_PRIVATE)
 
         // Theme toggle
-        val isDarkMode = sharedPreferences.getBoolean("dark_mode", false)
-        themeSwitch.isChecked = isDarkMode
         themeSwitch.setOnCheckedChangeListener { _, isChecked ->
             ThemeUtils.saveAndApplyTheme(this, isChecked)
             recreate()
         }
+
 
         // Notifications toggle
         val areNotificationsEnabled = sharedPreferences.getBoolean("notifications_enabled", true)

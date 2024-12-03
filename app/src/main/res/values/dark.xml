@@ -3,6 +3,10 @@
         <item name="colorPrimary">@color/main</item>
         <item name="colorPrimaryVariant">@color/side</item>
         <item name="colorOnPrimary">@color/onButton</item>
-        <item name="android:windowBackground">@color/white</item>
+        <item name="android:windowBackground">@color/main</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/main</item>
+        <item name="android:statusBarColor">@color/side</item>
+        <item name="android:colorControlNormal">@color/white</item> <!-- For icons -->
     </style>
 </resources>

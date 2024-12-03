@@ -8,8 +8,10 @@ import com.example.prizoscope.data.model.Item
 import com.example.prizoscope.databinding.ItemShoppingBinding
 import com.example.prizoscope.R
 
-class ItemAdapter(private var items: List<Item>) :
-    RecyclerView.Adapter<ItemAdapter.ItemViewHolder>() {
+class ItemAdapter(
+    private var items: List<Item>,
+    private val clickListener: (Item) -> Unit
+) : RecyclerView.Adapter<ItemAdapter.ItemViewHolder>() {
 
     fun updateData(newItems: List<Item>) {
         items = newItems
@@ -18,7 +20,7 @@ class ItemAdapter(private var items: List<Item>) :
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
         val binding = ItemShoppingBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ItemViewHolder(binding)
+        return ItemViewHolder(binding, clickListener)
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder, position: Int) {
@@ -28,8 +30,12 @@ class ItemAdapter(private var items: List<Item>) :
 
     override fun getItemCount() = items.size
 
-    class ItemViewHolder(private val binding: ItemShoppingBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: Item ) {
+    class ItemViewHolder(
+        private val binding: ItemShoppingBinding,
+        private val clickListener: (Item) -> Unit
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(item: Item) {
             binding.itemName.text = item.name
             binding.itemPrice.text = String.format("$%.2f", item.price)
             binding.itemRatings.text = String.format("%.1f/5", item.ratings)
@@ -40,6 +46,9 @@ class ItemAdapter(private var items: List<Item>) :
                 .placeholder(R.drawable.ic_launcher_foreground)
                 .error(R.drawable.ic_launcher_foreground)
                 .into(binding.itemImage)
+
+            // Set the click listener
+            binding.root.setOnClickListener { clickListener(item) }
         }
     }
 }
