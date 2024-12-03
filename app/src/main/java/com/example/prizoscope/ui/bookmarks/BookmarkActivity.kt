@@ -12,6 +12,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.maps.MapActivity
 import com.example.prizoscope.ui.camera.CameraActivity
+import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -89,12 +90,13 @@ class BookmarkActivity : AppCompatActivity() {
                     finish()
                     true
                 }
-                R.id.nav_shopping -> {
+                R.id.nav_shopping -> true
+
+                R.id.nav_bookmarks -> {
                     startActivity(Intent(this, ShoppingActivity::class.java))
                     finish()
                     true
                 }
-                R.id.nav_bookmarks -> true
                 else -> false
             }
         }
