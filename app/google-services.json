@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "495746607948",
+    "project_id": "prizoscope",
+    "storage_bucket": "prizoscope.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:495746607948:android:59f39e341efe65588ebde9",
+        "android_client_info": {
+          "package_name": "com.example.prizoscope"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYi0peyX-6tIN4QArDC75DHGE2wxvvC_g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

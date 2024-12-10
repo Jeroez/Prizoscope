@@ -1,57 +1,21 @@
 package com.example.prizoscope.data.repository
 
-import android.content.Context
 import com.example.prizoscope.data.model.Item
-import com.opencsv.CSVReader
-import java.io.InputStreamReader
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
+import kotlinx.coroutines.tasks.await
 
-class ItemRepository(private val context: Context) {
+class ItemRepository {
 
-    private val items = mutableListOf<Item>()
-    private val bookmarkedItems = mutableListOf<Item>()
+    private val firestore = FirebaseFirestore.getInstance()
+    private val itemsCollection = firestore.collection("items")
 
-    init {
-        loadItemsFromCsv()
+    suspend fun fetchAllItems(): List<Item> {
+        val snapshot = itemsCollection.get().await()
+        return snapshot.documents.mapNotNull { it.toObject<Item>() }
     }
 
-    private fun loadItemsFromCsv() {
-        try {
-            val inputStream = context.assets.open("items.csv")
-            val reader = CSVReader(InputStreamReader(inputStream))
-            val rows = reader.readAll()
-
-            for (row in rows.drop(1)) {
-                try {
-                    val priceString = row[2].replace("₱", "").replace(",", "") // Remove ₱ and commas
-                    val item = Item(
-                        id = row[0],
-                        name = row[1],
-                        price = priceString.toDouble(),
-                        imageLink = row[5],
-                        ratings = row[3].toFloat(),
-                        purchaseLink = row[4]
-                    )
-                    items.add(item)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    fun getAllItems(): List<Item> {
-        return items
-    }
-
-    fun bookmarkItem(item: Item) {
-        if (!bookmarkedItems.contains(item)) {
-            bookmarkedItems.add(item)
-        }
-    }
-
-    fun getBookmarkedItems(): List<Item> {
-        return bookmarkedItems
+    fun addItem(item: Item) {
+        itemsCollection.document(item.id).set(item)
     }
 }
