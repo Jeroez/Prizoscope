@@ -10,7 +10,9 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:padding="8dp"
+        android:layout_marginTop="60dp"
         android:layout_marginBottom="70dp">
+
 
         <!-- Chat Messages -->
         <androidx.recyclerview.widget.RecyclerView

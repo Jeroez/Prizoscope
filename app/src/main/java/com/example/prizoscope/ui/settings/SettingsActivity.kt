@@ -26,10 +26,15 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var aboutButton: TextView
     private lateinit var bottomNavigationView: BottomNavigationView
 
+    // SharedPreferences for app settings and user session
+    private lateinit var appPreferences: SharedPreferences
+    private lateinit var userSessionPreferences: SharedPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
+        // Initialize Views
         themeSwitch = findViewById(R.id.switch_theme)
         logoutButton = findViewById(R.id.logout_button)
         notificationsSwitch = findViewById(R.id.switch_notifications)
@@ -37,56 +42,94 @@ class SettingsActivity : AppCompatActivity() {
         aboutButton = findViewById(R.id.about_button)
         bottomNavigationView = findViewById(R.id.bottom_nav)
 
-        val sharedPreferences: SharedPreferences =
-            getSharedPreferences("app_prefs", MODE_PRIVATE)
+        // Initialize SharedPreferences
+        appPreferences = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        userSessionPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
 
-        // Theme toggle
+        // Setup theme toggle
+        val isDarkModeEnabled = appPreferences.getBoolean("dark_mode", false) // Default: Light mode
+        themeSwitch.isChecked = isDarkModeEnabled
         themeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            ThemeUtils.saveAndApplyTheme(this, isChecked)
-            recreate()
+            ThemeUtils.saveAndApplyTheme(this, isChecked) // Save and apply theme
+            recreate() // Restart the activity to apply the theme
         }
-
 
         // Notifications toggle
-        val areNotificationsEnabled = sharedPreferences.getBoolean("notifications_enabled", true)
+        val areNotificationsEnabled = appPreferences.getBoolean("notifications_enabled", true) // Default: Enabled
         notificationsSwitch.isChecked = areNotificationsEnabled
         notificationsSwitch.setOnCheckedChangeListener { _, isChecked ->
-            sharedPreferences.edit().putBoolean("notifications_enabled", isChecked).apply()
+            appPreferences.edit().putBoolean("notifications_enabled", isChecked).apply()
         }
 
-        // Logout
+        // Logout button
         logoutButton.setOnClickListener {
-            sharedPreferences.edit().clear().apply()
-            startActivity(Intent(this, Startup::class.java))
-            finish()
+            logoutUser()
         }
 
-        // Reset settings
+        // Reset settings button
         resetButton.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("Reset Settings")
-                .setMessage("Are you sure you want to reset all settings?")
-                .setPositiveButton("Yes") { _, _ ->
-                    sharedPreferences.edit().clear().apply()
-                    recreate()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            showResetDialog()
         }
 
-        // About section
+        // About button
         aboutButton.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("About")
-                .setMessage("PrizoScope\nVersion: 1.0\nDeveloped by Gomez Jeremiah.\nTeam members: Awal Emzelle & Echon Adrian")
-                .setPositiveButton("OK", null)
-                .show()
+            showAboutDialog()
         }
 
+        // Setup bottom navigation
         setupBottomNav()
     }
 
+    /**
+     * Clears user session and navigates to the Startup screen.
+     */
+    private fun logoutUser() {
+        userSessionPreferences.edit().clear().apply() // Clear user session
+        appPreferences.edit().remove("notifications_enabled").remove("dark_mode").apply() // Clear app-specific settings (optional)
+        val intent = Intent(this, Startup::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK // Clear activity stack
+        startActivity(intent)
+    }
+
+    /**
+     * Displays a reset settings confirmation dialog.
+     */
+    private fun showResetDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Reset Settings")
+            .setMessage("Are you sure you want to reset all settings?")
+            .setPositiveButton("Yes") { _, _ ->
+                resetSettings()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Clears app preferences and resets UI state.
+     */
+    private fun resetSettings() {
+        appPreferences.edit().clear().apply() // Clear app preferences
+        recreate() // Restart activity to apply changes
+    }
+
+    /**
+     * Displays the About dialog with app information.
+     */
+    private fun showAboutDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("About")
+            .setMessage("PrizoScope\nVersion: 1.0\nDeveloped by Gomez Jeremiah.\nTeam members: Awal Emzelle & Echon Adrian")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    /**
+     * Sets up the bottom navigation bar.
+     */
     private fun setupBottomNav() {
+        bottomNavigationView.selectedItemId = R.id.nav_settings // Highlight current tab
+
         bottomNavigationView.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_camera -> {
@@ -111,4 +154,3 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 }
-

@@ -14,10 +14,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.example.prizoscope.R
-import com.example.prizoscope.data.model.Item
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.chat.ChatActivity
+import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.mlkit.vision.common.InputImage
@@ -26,8 +27,6 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.example.prizoscope.ui.settings.SettingsActivity
 
 class CameraActivity : AppCompatActivity() {
 
@@ -36,6 +35,7 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var recognizer: TextRecognizer
     private lateinit var firestore: FirebaseFirestore
+    private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
 
     private val TAG = "CameraActivity"
 
@@ -55,17 +55,19 @@ class CameraActivity : AppCompatActivity() {
         // Initialize Camera Executor
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // Start Camera Immediately
+        // Start Camera
         startCamera()
 
         // Enable Price Tag Movement
         setupPriceTagMovement()
+
+        // Setup Bottom Navigation
+        setupBottomNav()
     }
 
     @OptIn(ExperimentalGetImage::class)
     private fun startCamera() {
-        val cameraProviderFuture: ListenableFuture<ProcessCameraProvider> =
-            ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -126,7 +128,7 @@ class CameraActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { documents ->
                 if (!documents.isEmpty) {
-                    val item = documents.documents.first().toObject(Item::class.java)
+                    val item = documents.documents.first().toObject(com.example.prizoscope.data.model.Item::class.java)
                     if (item != null) {
                         updatePriceTag(item)
                     }
@@ -137,31 +139,29 @@ class CameraActivity : AppCompatActivity() {
             }
     }
 
-    private fun updatePriceTag(item: Item) {
+    private fun updatePriceTag(item: com.example.prizoscope.data.model.Item) {
         priceTagView.visibility = View.VISIBLE
 
-        // Determine the price to display
-        val finalPrice = if (item.discount_price.isNullOrEmpty()) {
+        // Determine price to display
+        val finalPrice = if (!item.discount_price.isNullOrEmpty()) {
             item.discount_price
         } else {
             item.price
         }
 
-        // Update the price tag with the item details
-        val promotionMessage = if (item.discount_price.isNullOrEmpty()) {
+        // Update the price tag with item details
+        val promotionMessage = if (!item.discount_price.isNullOrEmpty()) {
             "\n(Promotion! Original: ₱${item.price})"
         } else {
             ""
         }
 
         priceTagView.text = """
-        Name: ${item.name}
-        Price: ₱$finalPrice$promotionMessage
-        Rating: ${item.rating} ★
-    """.trimIndent()
+            Name: ${item.name}
+            Price: ₱$finalPrice$promotionMessage
+            Rating: ${item.rating} ★
+        """.trimIndent()
     }
-
-
 
     private fun setupPriceTagMovement() {
         priceTagView.setOnTouchListener { view, motionEvent ->
@@ -175,9 +175,19 @@ class CameraActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        stopCamera() // Shut down camera when activity is paused
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        cameraExecutor.shutdown()
+        cameraExecutor.shutdown() // Clean up camera executor
+    }
+
+    private fun stopCamera() {
+        // Unbind camera use cases and release resources
+        cameraProviderFuture.get().unbindAll()
     }
 
     private fun setupBottomNav() {
@@ -186,29 +196,21 @@ class CameraActivity : AppCompatActivity() {
 
         bottomNav.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_camera -> true // Stay on this activity
+                R.id.nav_camera -> true // Stay on the current activity
                 R.id.nav_shopping -> {
-                    Log.d("Navigation", "Switching to Shopping")
                     startActivity(Intent(this, ShoppingActivity::class.java))
-                    finish()
                     true
                 }
                 R.id.nav_bookmarks -> {
-                    Log.d("Navigation", "Switching to Bookmarks")
                     startActivity(Intent(this, BookmarkActivity::class.java))
-                    finish()
                     true
                 }
                 R.id.nav_settings -> {
-                    Log.d("Navigation", "Switching to Settings")
                     startActivity(Intent(this, SettingsActivity::class.java))
-                    finish()
                     true
                 }
                 R.id.nav_chat -> {
-                    Log.d("Navigation", "Switching to Chat")
                     startActivity(Intent(this, ChatActivity::class.java))
-                    finish()
                     true
                 }
                 else -> false

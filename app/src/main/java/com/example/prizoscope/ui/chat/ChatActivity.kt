@@ -14,42 +14,42 @@ import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.camera.CameraActivity
 import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
+import com.example.prizoscope.ui.auth.Login
+
+import com.example.prizoscope.utils.DatabaseHelper
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 class ChatActivity : AppCompatActivity() {
 
     private lateinit var messageAdapter: MessageAdapter
-    private lateinit var messageList: RecyclerView
-    private lateinit var inputMessage: EditText
-    private lateinit var btnSend: Button
     private val messages = mutableListOf<Message>()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // Replace with logged-in user's name
-    private val userName: String by lazy { getLoggedInUserName() }
+    // Replace "JohnDoe" with the user's actual name from the database
+    private lateinit var userName: String // To be fetched dynamically
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
-        // Initialize UI components
-        messageList = findViewById(R.id.message_list)
-        inputMessage = findViewById(R.id.input_message)
-        btnSend = findViewById(R.id.btn_send)
+        val messageList = findViewById<RecyclerView>(R.id.message_list)
+        val inputMessage = findViewById<EditText>(R.id.input_message)
+        val btnSend = findViewById<Button>(R.id.btn_send)
 
-        // Setup RecyclerView
+        // Fetch the user's actual name
+        userName = fetchUserName() // Dynamically fetch the username
+
+        // Set up RecyclerView
         messageAdapter = MessageAdapter(messages)
         messageList.layoutManager = LinearLayoutManager(this)
         messageList.adapter = messageAdapter
 
-        // Setup bottom navigation
-        setupBottomNav()
-
-        // Load chat messages
+        // Load messages for the user
         loadMessages()
 
-        // Send message when button is clicked
+        // Send a new message
         btnSend.setOnClickListener {
             val userMessage = inputMessage.text.toString()
             if (userMessage.isNotBlank()) {
@@ -57,57 +57,105 @@ class ChatActivity : AppCompatActivity() {
                 inputMessage.text.clear()
             }
         }
+
+        setupBottomNav()
     }
+
+    private fun fetchUserName(): String {
+        val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
+        val loggedInUsername = sharedPreferences.getString("username", null)
+
+        if (loggedInUsername == null) {
+            // If no username is found, redirect to login
+            Log.e("ChatActivity", "No logged-in username found. Redirecting to login.")
+            startActivity(Intent(this, Login::class.java))
+            finish()
+        }
+
+        return loggedInUsername ?: "Unknown User" // Fallback, but should rarely occur
+    }
+
+
 
     private fun loadMessages() {
         val chatRef = firestore.collection("chats").document(userName)
 
-        chatRef.addSnapshotListener { snapshot, e ->
-            if (e != null) {
-                Log.e("ChatActivity", "Error fetching messages", e)
-                return@addSnapshotListener
-            }
-
-            if (snapshot != null && snapshot.exists()) {
+        chatRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
                 messages.clear()
 
-                snapshot.data?.forEach { (key, value) ->
-                    if (key.startsWith("user_message_")) {
-                        messages.add(Message(sender = "User", text = value.toString()))
-                    } else if (key.startsWith("admin_message_")) {
-                        messages.add(Message(sender = "Admin", text = value.toString()))
-                    }
+                // Extract, sort, and parse the messages
+                val sortedEntries = document.data?.entries
+                    ?.sortedBy { it.key.substringAfterLast('_').toIntOrNull() } // Sort by the numeric suffix
+
+                sortedEntries?.forEach { entry ->
+                    val sender = if (entry.key.startsWith("user_message")) "User" else "Admin"
+                    val text = entry.value.toString()
+                    messages.add(Message(sender = sender, text = text))
                 }
 
-                messages.sortBy { it.text } // Optional sorting logic
+                // Update adapter and scroll to bottom
                 messageAdapter.notifyDataSetChanged()
-                messageList.scrollToPosition(messages.size - 1)
+                scrollToBottom()
+            } else {
+                Log.d("ChatActivity", "No chat history found for $userName")
             }
+        }.addOnFailureListener { e ->
+            Log.e("ChatActivity", "Error loading messages", e)
         }
     }
+
+    private fun scrollToBottom() {
+        val messageList = findViewById<RecyclerView>(R.id.message_list)
+        messageList.scrollToPosition(messages.size - 1)
+    }
+
+
+
+
 
     private fun sendMessage(userMessage: String) {
         val chatRef = firestore.collection("chats").document(userName)
 
         chatRef.get().addOnSuccessListener { document ->
-            // Calculate the next message index based on the existing number of fields
-            val nextMessageIndex = document?.data?.filterKeys { it.startsWith("user_message_") }?.size?.plus(1) ?: 1
-            val newMessageKey = "user_message_$nextMessageIndex"
+            if (document.exists()) {
+                // Document exists: Add the new message
+                val messageCount = document.data?.keys
+                    ?.filter { it.startsWith("user_message") || it.startsWith("admin_message") }
+                    ?.size ?: 0 // Count all existing messages
 
-            // Create update data with explicit type casting
-            val updateData = mapOf(
-                newMessageKey to userMessage
-            )
+                val newMessageKey = "user_message_${messageCount + 1}"
 
-            chatRef.update(updateData)
-                .addOnSuccessListener {
-                    Log.d("ChatActivity", "Message sent successfully")
-                }
-                .addOnFailureListener { e ->
-                    Log.e("ChatActivity", "Error sending message", e)
-                }
+                val updateData = mapOf(newMessageKey to userMessage)
+
+                chatRef.update(updateData)
+                    .addOnSuccessListener {
+                        Log.d("ChatActivity", "Message sent successfully")
+                        loadMessages() // Reload messages after sending
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ChatActivity", "Error sending message", e)
+                    }
+            } else {
+                // Document doesn't exist: Create it with the first message
+                val initialData = mapOf("user_message_1" to userMessage)
+
+                chatRef.set(initialData)
+                    .addOnSuccessListener {
+                        Log.d("ChatActivity", "New document created, and message sent successfully")
+                        loadMessages() // Reload messages after sending
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ChatActivity", "Error creating new document", e)
+                    }
+            }
+        }.addOnFailureListener { e ->
+            Log.e("ChatActivity", "Error accessing chat document", e)
         }
     }
+
+
+
 
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)
@@ -139,11 +187,5 @@ class ChatActivity : AppCompatActivity() {
                 else -> false
             }
         }
-    }
-
-    // Mock function: Replace with logic to fetch logged-in user's name
-    private fun getLoggedInUserName(): String {
-        // Fetch from SharedPreferences or SQLite
-        return "JohnDoe"
     }
 }

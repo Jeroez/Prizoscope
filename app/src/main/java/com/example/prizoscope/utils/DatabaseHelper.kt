@@ -94,6 +94,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         }
     }
 
+
+
+
     fun addItem(item: Item): Boolean {
         val db = this.writableDatabase
         val values = ContentValues().apply {
@@ -179,5 +182,27 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         db.close()
         return items
     }
+
+    fun getUserDetails(username: String): Map<String, String>? {
+        val db = this.readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT * FROM users WHERE username = ?",
+            arrayOf(username)
+        )
+
+        return if (cursor.moveToFirst()) {
+            val userDetails = mutableMapOf<String, String>()
+            userDetails["id"] = cursor.getInt(cursor.getColumnIndexOrThrow("id")).toString()
+            userDetails["username"] = cursor.getString(cursor.getColumnIndexOrThrow("username"))
+            cursor.close()
+            db.close()
+            userDetails
+        } else {
+            cursor.close()
+            db.close()
+            null
+        }
+    }
+
 
 }

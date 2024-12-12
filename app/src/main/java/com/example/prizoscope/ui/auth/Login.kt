@@ -22,8 +22,17 @@ class Login : AppCompatActivity() {
         userRepository = UserRepository(this)
 
         binding.btnLogin.setOnClickListener {
+
+
             val username = binding.edtUsername.text.toString().trim()
             val password = binding.edtPassword.text.toString().trim()
+
+
+            val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
+            val editor = sharedPreferences.edit()
+            editor.putString("username", username) // Save the logged-in username
+            editor.apply()
+
 
             if (username.isNotEmpty() && password.isNotEmpty()) {
                 if (userRepository.authenticate(username, password)) { // Updated method call
@@ -41,4 +50,5 @@ class Login : AppCompatActivity() {
             startActivity(Intent(this, Signup::class.java))
         }
     }
+
 }
