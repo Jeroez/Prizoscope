@@ -8,17 +8,20 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.prizoscope.R
 import com.example.prizoscope.data.model.Item
+import com.example.prizoscope.utils.DatabaseHelper
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.chat.ChatActivity
 import com.example.prizoscope.ui.camera.CameraActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 
-
 class BookmarkActivity : AppCompatActivity() {
+
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: BookmarkAdapter
     private val bookmarks: MutableList<Item> = mutableListOf()
+    private lateinit var databaseHelper: DatabaseHelper
+    private var userId: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +30,21 @@ class BookmarkActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        loadBookmarks()
+        // Initialize DatabaseHelper
+        databaseHelper = DatabaseHelper(this)
+
+        // Get the logged-in user's ID
+        val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
+        val username = sharedPreferences.getString("username", null)
+        userId = databaseHelper.getUserId(username ?: "")
+
+        if (userId != null) {
+            loadBookmarks()
+        } else {
+            // Handle the case where the user is not logged in
+            bookmarks.clear()
+        }
+
         adapter = BookmarkAdapter(bookmarks) { bookmark ->
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(bookmark.purchaseLink)))
         }
@@ -37,17 +54,22 @@ class BookmarkActivity : AppCompatActivity() {
     }
 
     private fun loadBookmarks() {
-        val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString("bookmarks", "[]")
-        bookmarks.clear()
-        bookmarks.addAll(Item.fromJsonArray(bookmarkJson ?: "[]"))
+        val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
+        val username = sharedPreferences.getString("username", null)
+
+        if (username != null) {
+            // Use a key unique to the user
+            val bookmarkKey = "bookmarks_$username"
+
+            val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString(bookmarkKey, "[]")
+            bookmarks.clear()
+            bookmarks.addAll(Item.fromJsonArray(bookmarkJson ?: "[]"))
+        } else {
+            // Handle the case where the user is not logged in
+            bookmarks.clear()
+        }
     }
 
-    private fun saveBookmarks() {
-        val bookmarkJson = Item.toJsonArray(bookmarks)
-        getSharedPreferences("bookmarks", MODE_PRIVATE).edit()
-            .putString("bookmarks", bookmarkJson)
-            .apply()
-    }
 
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)

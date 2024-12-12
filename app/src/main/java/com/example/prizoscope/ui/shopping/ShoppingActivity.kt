@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
@@ -114,15 +115,31 @@ class ShoppingActivity : AppCompatActivity() {
     }
 
     private fun saveToBookmarks(item: Item) {
-        val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString("bookmarks", "[]")
-        val bookmarks = Item.fromJsonArray(bookmarkJson ?: "[]").toMutableList()
-        bookmarks.add(item)
+        val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
+        val username = sharedPreferences.getString("username", null)
 
-        val updatedJson = Item.toJsonArray(bookmarks)
-        getSharedPreferences("bookmarks", MODE_PRIVATE).edit()
-            .putString("bookmarks", updatedJson)
-            .apply()
+        if (username != null) {
+            // Use a key unique to the user
+            val bookmarkKey = "bookmarks_$username"
+
+            val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString(bookmarkKey, "[]")
+            val bookmarks = Item.fromJsonArray(bookmarkJson ?: "[]").toMutableList()
+
+            // Add the new item to the user's bookmarks
+            bookmarks.add(item)
+
+            val updatedJson = Item.toJsonArray(bookmarks)
+            getSharedPreferences("bookmarks", MODE_PRIVATE).edit()
+                .putString(bookmarkKey, updatedJson)
+                .apply()
+        } else {
+            // Handle the case where the user is not logged in
+            Toast.makeText(this, "User not logged in. Cannot save bookmarks.", Toast.LENGTH_SHORT).show()
+        }
     }
+
+
+
 
     private fun setupBottomNav() {
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottom_nav)
