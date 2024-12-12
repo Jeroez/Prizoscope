@@ -79,22 +79,16 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         return exists
     }
 
-    fun getUserDetails(username: String): Map<String, String>? {
+    fun getUserId(username: String): Int? {
         val db = this.readableDatabase
-        val cursor: Cursor? = db.rawQuery(
-            "SELECT * FROM users WHERE username = ?",
-            arrayOf(username)
-        )
-
-        return if (cursor != null && cursor.moveToFirst()) {
-            val userDetails = mutableMapOf<String, String>()
-            userDetails["id"] = cursor.getInt(cursor.getColumnIndexOrThrow("id")).toString()
-            userDetails["username"] = cursor.getString(cursor.getColumnIndexOrThrow("username"))
+        val cursor = db.rawQuery("SELECT id FROM users WHERE username = ?", arrayOf(username))
+        return if (cursor.moveToFirst()) {
+            val userId = cursor.getInt(cursor.getColumnIndexOrThrow("id"))
             cursor.close()
             db.close()
-            userDetails
+            userId
         } else {
-            cursor?.close()
+            cursor.close()
             db.close()
             null
         }
@@ -106,7 +100,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
             put("name", item.name)
             put("price", item.price)
             put("imageLink", item.imageLink)
-            put("ratings", item.ratings)
+            put("ratings", item.rating)
             put("purchaseLink", item.purchaseLink)
         }
 
@@ -130,9 +124,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                 val item = Item(
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
-                    price = cursor.getDouble(cursor.getColumnIndexOrThrow("price")),
+                    price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
                     imageLink = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
-                    ratings = cursor.getFloat(cursor.getColumnIndexOrThrow("ratings")),
+                    rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
                     purchaseLink = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
@@ -163,11 +157,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
     fun getBookmarkedItems(userId: Int): List<Item> {
         val db = this.readableDatabase
         val cursor: Cursor = db.rawQuery(
-            """
-            SELECT items.* FROM items 
-            INNER JOIN bookmarks ON items.id = bookmarks.item_id 
-            WHERE bookmarks.user_id = ?
-            """,
+            "SELECT items.* FROM items INNER JOIN bookmarks ON items.id = bookmarks.item_id WHERE bookmarks.user_id = ?",
             arrayOf(userId.toString())
         )
 
@@ -177,9 +167,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                 val item = Item(
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
-                    price = cursor.getDouble(cursor.getColumnIndexOrThrow("price")),
+                    price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
                     imageLink = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
-                    ratings = cursor.getFloat(cursor.getColumnIndexOrThrow("ratings")),
+                    rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
                     purchaseLink = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
@@ -189,4 +179,5 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         db.close()
         return items
     }
+
 }

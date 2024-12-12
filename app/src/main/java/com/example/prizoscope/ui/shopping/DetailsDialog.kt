@@ -19,7 +19,7 @@ class DetailsDialog(private val item: Item) : DialogFragment() {
 
         binding.itemName.text = item.name
         binding.itemPrice.text = String.format("$%.2f", item.price)
-        binding.itemRatings.text = String.format("%.1f/5.0", item.ratings)
+        binding.itemRatings.text = String.format("%.1f/5.0", item.rating)
 
         binding.bookmarkButton.setOnClickListener {
             dismiss()

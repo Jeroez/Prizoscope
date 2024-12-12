@@ -6,7 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.prizoscope.R
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.camera.CameraActivity
-import com.example.prizoscope.ui.maps.MapActivity
+import com.example.prizoscope.ui.chat.ChatActivity
 import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_shopping -> navigateToActivity(ShoppingActivity::class.java)
                 R.id.nav_bookmarks -> navigateToActivity(BookmarkActivity::class.java)
                 R.id.nav_settings -> navigateToActivity(SettingsActivity::class.java)
-                R.id.nav_maps -> navigateToActivity(MapActivity::class.java)
+                R.id.nav_chat -> navigateToActivity(ChatActivity::class.java)
             }
             true
         }

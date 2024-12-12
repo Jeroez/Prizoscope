@@ -18,9 +18,9 @@ class CsvParser(private val context: Context) {
                         Item(
                             id = columns[0].trim(),
                             name = columns[1].trim(),
-                            price = columns[2].trim().toDouble(),
+                            price = columns[2].trim().toString(),
                             imageLink = columns[3].trim(),
-                            ratings = columns[4].trim().toFloat(),
+                            rating = columns[4].trim().toString(),
                             purchaseLink = columns[5].trim()
                         )
                     )

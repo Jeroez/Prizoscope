@@ -10,13 +10,9 @@ import com.example.prizoscope.R
 import com.example.prizoscope.data.model.Item
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.example.prizoscope.ui.settings.SettingsActivity
-import com.example.prizoscope.ui.maps.MapActivity
+import com.example.prizoscope.ui.chat.ChatActivity
 import com.example.prizoscope.ui.camera.CameraActivity
-import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
-import java.io.BufferedReader
-import java.io.InputStreamReader
-
 
 
 class BookmarkActivity : AppCompatActivity() {
@@ -46,6 +42,12 @@ class BookmarkActivity : AppCompatActivity() {
         bookmarks.addAll(Item.fromJsonArray(bookmarkJson ?: "[]"))
     }
 
+    private fun saveBookmarks() {
+        val bookmarkJson = Item.toJsonArray(bookmarks)
+        getSharedPreferences("bookmarks", MODE_PRIVATE).edit()
+            .putString("bookmarks", bookmarkJson)
+            .apply()
+    }
 
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)
@@ -59,8 +61,8 @@ class BookmarkActivity : AppCompatActivity() {
                     finish()
                     true
                 }
-                R.id.nav_maps -> {
-                    startActivity(Intent(this, MapActivity::class.java))
+                R.id.nav_chat -> {
+                    startActivity(Intent(this, ChatActivity::class.java))
                     finish()
                     true
                 }

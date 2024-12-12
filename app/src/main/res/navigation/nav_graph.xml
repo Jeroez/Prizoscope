@@ -17,10 +17,10 @@
         tools:layout="@layout/activity_settings" />
 
     <activity
-        android:id="@+id/nav_maps"
-        android:name="com.example.prizoscope.ui.maps.MapActivity"
-        android:label="Map"
-        tools:layout="@layout/activity_map" />
+        android:id="@+id/nav_chat"
+        android:name="com.example.prizoscope.ui.chat.ChatActivity"
+        android:label="Chat"
+        tools:layout="@layout/activity_chat" />
 
     <activity
         android:id="@+id/nav_shopping"

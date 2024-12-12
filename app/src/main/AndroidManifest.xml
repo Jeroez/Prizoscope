@@ -30,7 +30,7 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="true" />
         <activity
-            android:name=".ui.maps.MapActivity"
+            android:name=".ui.chat.ChatActivity"
             android:exported="true" />
         <activity
             android:name=".ui.bookmarks.BookmarkActivity"

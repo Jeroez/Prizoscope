@@ -11,10 +11,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.prizoscope.R
 import com.example.prizoscope.ui.Startup
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
-import com.example.prizoscope.ui.maps.MapActivity
+import com.example.prizoscope.ui.chat.ChatActivity
 import com.example.prizoscope.ui.shopping.ShoppingActivity
 import com.example.prizoscope.ui.camera.CameraActivity
-import com.example.prizoscope.utils.PreferencesManager
 import com.example.prizoscope.utils.ThemeUtils
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
@@ -103,8 +102,8 @@ class SettingsActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_settings -> true
-                R.id.nav_maps -> {
-                    startActivity(Intent(this, MapActivity::class.java))
+                R.id.nav_chat -> {
+                    startActivity(Intent(this, ChatActivity::class.java))
                     true
                 }
                 else -> false

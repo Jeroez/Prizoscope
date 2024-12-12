@@ -20,7 +20,4 @@ class ItemViewModel(private val itemRepository: ItemRepository) : ViewModel() {
         }
     }
 
-    fun addItem(item: Item) {
-        itemRepository.addItem(item)
-    }
 }
