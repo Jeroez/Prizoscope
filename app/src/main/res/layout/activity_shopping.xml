@@ -1,10 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
-xmlns:android="http://schemas.android.com/apk/res/android"
-xmlns:app="http://schemas.android.com/apk/res-auto"
-android:layout_width="match_parent"
-android:layout_height="match_parent"
-android:background="@color/main">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/main">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -13,23 +12,23 @@ android:background="@color/main">
         android:padding="16dp"
         android:background="@color/main">
 
-        <androidx.appcompat.widget.SearchView
-            android:id="@+id/search_view"
+        <EditText
+            android:id="@+id/search_field"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:queryHint="Search for items"
+            android:hint="Search for items"
             android:background="@color/white"
+            android:padding="8dp"
             android:layout_marginTop="60dp"
-            android:padding="8dp" />
-
+            android:imeOptions="actionSearch"
+            android:inputType="text" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="12dp"
-            android:clipToPadding="false"
-            />
+            android:clipToPadding="false" />
 
         <ProgressBar
             android:id="@+id/progress_bar"
@@ -40,16 +39,13 @@ android:background="@color/main">
             android:visibility="gone" />
     </LinearLayout>
 
-
-
     <!-- Bottom Navigation -->
-<com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottom_nav"
-    android:layout_width="match_parent"
-    android:layout_height="70dp"
-    android:layout_gravity="bottom"
-    app:menu="@menu/bottom_nav_menu"
-    app:labelVisibilityMode="unlabeled"
-    android:background="?android:attr/windowBackground" />
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:layout_gravity="bottom"
+        app:menu="@menu/bottom_nav_menu"
+        app:labelVisibilityMode="unlabeled"
+        android:background="?android:attr/windowBackground" />
 </FrameLayout>
-

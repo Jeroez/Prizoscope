@@ -97,26 +97,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
 
 
 
-    fun addItem(item: Item): Boolean {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put("name", item.name)
-            put("price", item.price)
-            put("imageLink", item.imageLink)
-            put("ratings", item.rating)
-            put("purchaseLink", item.purchaseLink)
-        }
-
-        return try {
-            db.insert("items", null, values) > 0
-        } catch (e: Exception) {
-            Log.e("DatabaseHelper", "Error adding item: ${e.message}")
-            false
-        } finally {
-            db.close()
-        }
-    }
-
     fun getAllItems(): List<Item> {
         val db = this.readableDatabase
         val cursor: Cursor = db.rawQuery("SELECT * FROM items", null)
@@ -128,9 +108,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
                     price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
-                    imageLink = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
+                    img_url = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
                     rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
-                    purchaseLink = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
+                    url = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
             } while (cursor.moveToNext())
@@ -171,9 +151,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
                     price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
-                    imageLink = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
+                    img_url = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
                     rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
-                    purchaseLink = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
+                    url = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
             } while (cursor.moveToNext())

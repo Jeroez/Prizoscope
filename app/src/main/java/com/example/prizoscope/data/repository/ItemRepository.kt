@@ -20,8 +20,8 @@ class ItemRepository {
                     name = document.getString("name") ?: "",
                     price = document.get("price").toString(), // Safely convert to string
                     rating = document.getString("rating") ?: "",
-                    purchaseLink = document.getString("url") ?: "",
-                    imageLink = document.getString("img_url") ?: "",
+                    url = document.getString("url") ?: "",
+                    img_url = document.getString("img_url") ?: "",
                     discount_price  = document.get("promotion.discount_price")?.toString() ?: "",
                     duration_hours = document.get("promotion.duration_hours")?.toString() ?: ""
                 )

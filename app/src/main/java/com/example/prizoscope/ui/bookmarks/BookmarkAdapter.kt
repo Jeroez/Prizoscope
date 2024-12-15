@@ -39,7 +39,7 @@ class BookmarkAdapter(
         holder.title.text = item.name
 
         Glide.with(holder.itemView.context)
-            .load(item.imageLink)
+            .load(item.img_url)
             .placeholder(R.drawable.ic_launcher_foreground)
             .into(holder.image)
     }

@@ -16,7 +16,7 @@
 
     <application
         android:allowBackup="true"
-        android:theme="@style/DarkTheme"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
@@ -40,6 +40,7 @@
             android:exported="true" />
         <activity
             android:name=".ui.camera.CameraActivity"
+            android:hardwareAccelerated="true"
             android:exported="true" />
         <activity
             android:name=".ui.Startup"
@@ -59,6 +60,13 @@
         <activity
             android:name=".ui.MainActivity"
             android:exported="true" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_launcher_foreground" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default_channel" />
     </application>
 
 </manifest>

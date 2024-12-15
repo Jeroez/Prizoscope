@@ -1,10 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/main">
+
+    <!-- TensorFlow TextureView for object detection -->
+    <android.view.TextureView
+        android:id="@+id/textureView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Object Detection Preview" />
 
     <!-- Camera Preview -->
     <androidx.camera.view.PreviewView
@@ -25,6 +31,7 @@
         android:visibility="gone"
         android:text="Price Tag"
         android:gravity="center" />
+
     <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"

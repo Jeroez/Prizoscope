@@ -41,6 +41,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+    aaptOptions {
+        noCompress("tflite")
+    }
 }
 
 dependencies {
@@ -95,6 +101,11 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-analytics")
 
+    implementation ("com.google.android.gms:play-services-base:18.0.1")
     implementation ("com.google.mlkit:linkfirebase:16.0.0")
+
+    implementation("org.tensorflow:tensorflow-lite:2.13.0")
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.3")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.3")
 
 }

@@ -24,7 +24,7 @@ class ItemAdapter(
         fun bind(item: Item) {
             // Load item image using Glide
             Glide.with(itemView.context)
-                .load(item.imageLink)
+                .load(item.img_url)
                 .placeholder(R.drawable.ic_launcher_foreground) 
                 .into(itemImage)
 

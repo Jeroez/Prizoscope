@@ -46,7 +46,7 @@ class BookmarkActivity : AppCompatActivity() {
         }
 
         adapter = BookmarkAdapter(bookmarks) { bookmark ->
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(bookmark.purchaseLink)))
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(bookmark.img_url)))
         }
         recyclerView.adapter = adapter
 

@@ -1,193 +1,276 @@
 package com.example.prizoscope.ui.camera
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.*
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
-import android.view.MotionEvent
-import android.view.View
-import android.widget.TextView
-import androidx.annotation.OptIn
+import android.view.Surface
+import android.view.TextureView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.example.prizoscope.R
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.example.prizoscope.ui.shopping.ShoppingActivity
+import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.chat.ChatActivity
-import com.example.prizoscope.ui.settings.SettingsActivity
-import com.example.prizoscope.ui.shopping.ShoppingActivity
-import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.google.common.util.concurrent.ListenableFuture
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.support.image.ImageProcessor
+import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.support.image.ops.ResizeOp
+import org.tensorflow.lite.support.common.FileUtil
 
 class CameraActivity : AppCompatActivity() {
 
-    private lateinit var previewView: PreviewView
-    private lateinit var priceTagView: TextView
-    private lateinit var cameraExecutor: ExecutorService
-    private lateinit var recognizer: TextRecognizer
+    private lateinit var textureView: TextureView
+    private lateinit var cameraDevice: CameraDevice
+    private lateinit var cameraManager: CameraManager
+    private lateinit var handler: Handler
     private lateinit var firestore: FirebaseFirestore
-    private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
-
+    private lateinit var labels: List<String>
+    private lateinit var interpreter: Interpreter
+    private val paint = Paint()
     private val TAG = "CameraActivity"
+    private var lastScanTime = System.currentTimeMillis()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera)
 
-        // Initialize Views
-        previewView = findViewById(R.id.preview_image_view)
-        priceTagView = findViewById(R.id.price_text_view)
-        priceTagView.visibility = View.GONE // Hide price tag initially
-
-        // Initialize Firebase and ML Kit
+        textureView = findViewById(R.id.textureView)
         firestore = FirebaseFirestore.getInstance()
-        recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        // Initialize Camera Executor
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        // Initialize TensorFlow Lite model and labels
+        labels = FileUtil.loadLabels(this, "labels.txt")
+        val model = FileUtil.loadMappedFile(this, "model.tflite")
+        interpreter = Interpreter(model)
 
-        // Start Camera
-        startCamera()
+        // Camera setup
+        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
-        // Enable Price Tag Movement
-        setupPriceTagMovement()
+        val handlerThread = HandlerThread("CameraThread")
+        handlerThread.start()
+        handler = Handler(handlerThread.looper)
 
-        // Setup Bottom Navigation
-        setupBottomNav()
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(
+                surface: SurfaceTexture,
+                width: Int,
+                height: Int
+            ) {
+                openCamera()
+            }
+
+            override fun onSurfaceTextureSizeChanged(
+                surface: SurfaceTexture,
+                width: Int,
+                height: Int
+            ) {
+            }
+
+            override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = false
+            override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastScanTime > 5000) { // Scan every 5 seconds
+                    lastScanTime = currentTime
+                    val bitmap = textureView.bitmap ?: return
+                    processFrame(bitmap)
+                }
+            }
+        }
+
+        requestCameraPermission()
     }
 
-    @OptIn(ExperimentalGetImage::class)
-    private fun startCamera() {
-        cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+    @SuppressLint("MissingPermission")
+    private fun openCamera() {
+        cameraManager.openCamera(
+            cameraManager.cameraIdList[0],
+            object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    cameraDevice = camera
+                    val surfaceTexture = textureView.surfaceTexture
+                    val surface = Surface(surfaceTexture)
 
-        cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                    val captureRequest =
+                        cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                    captureRequest.addTarget(surface)
 
-            // Configure Camera Preview
-            val preview = androidx.camera.core.Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-            // Configure Image Analysis for real-time text recognition
-            val imageAnalysis = androidx.camera.core.ImageAnalysis.Builder()
-                .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-
-            // Attach the analyzer
-            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                val mediaImage = imageProxy.image
-                if (mediaImage != null) {
-                    val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-                    recognizer.process(inputImage)
-                        .addOnSuccessListener { visionText ->
-                            val detectedText = visionText.text
-                            if (detectedText.isNotEmpty()) {
-                                searchFirestoreForItem(detectedText)
+                    cameraDevice.createCaptureSession(
+                        listOf(surface),
+                        object : CameraCaptureSession.StateCallback() {
+                            override fun onConfigured(session: CameraCaptureSession) {
+                                session.setRepeatingRequest(captureRequest.build(), null, null)
                             }
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e(TAG, "Text recognition failed: ${e.message}")
-                        }
-                        .addOnCompleteListener {
-                            imageProxy.close()
-                        }
-                }
-            }
 
-            // Bind Preview and Analysis to the lifecycle
-            try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this,
-                    cameraSelector,
-                    preview,
-                    imageAnalysis
-                )
-            } catch (exc: Exception) {
-                Log.e(TAG, "Camera binding failed", exc)
-            }
-        }, ContextCompat.getMainExecutor(this))
+                            override fun onConfigureFailed(session: CameraCaptureSession) {}
+                        },
+                        handler
+                    )
+                }
+
+                override fun onDisconnected(camera: CameraDevice) {}
+                override fun onError(camera: CameraDevice, error: Int) {}
+            },
+            handler
+        )
     }
 
-    private fun searchFirestoreForItem(text: String) {
-        firestore.collection("items")
-            .whereEqualTo("name", text) // Adjust query logic as needed
-            .get()
-            .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    val item = documents.documents.first().toObject(com.example.prizoscope.data.model.Item::class.java)
-                    if (item != null) {
-                        updatePriceTag(item)
+    private fun requestCameraPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 101)
+        }
+    }
+
+    private fun processFrame(bitmap: Bitmap) {
+        processTextRecognition(bitmap) { detectedText ->
+            if (detectedText.isNotEmpty()) {
+                matchTextWithFirestore(detectedText) { matchedItem ->
+                    if (matchedItem != null) {
+                        redirectToShopping(matchedItem)
+                    } else {
+                        // If no text match, fallback to object detection
+                        processObjectDetection(bitmap)
                     }
                 }
+            } else {
+                processObjectDetection(bitmap)
             }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "Firestore query failed: ${e.message}")
+        }
+    }
+
+    private fun processTextRecognition(bitmap: Bitmap, onResult: (String) -> Unit) {
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        recognizer.process(image)
+            .addOnSuccessListener { result ->
+                onResult(result.text)
+            }
+            .addOnFailureListener {
+                Log.e(TAG, "Text recognition failed: ${it.message}")
+                onResult("")
             }
     }
 
-    private fun updatePriceTag(item: com.example.prizoscope.data.model.Item) {
-        priceTagView.visibility = View.VISIBLE
+    private fun matchTextWithFirestore(text: String, onResult: (String?) -> Unit) {
+        firestore.collection("items")
+            .get()
+            .addOnSuccessListener { documents ->
+                var bestMatch: String? = null
+                var highestMatchScore = 0.0
 
-        // Determine price to display
-        val finalPrice = if (!item.discount_price.isNullOrEmpty()) {
-            item.discount_price
-        } else {
-            item.price
-        }
-
-        // Update the price tag with item details
-        val promotionMessage = if (!item.discount_price.isNullOrEmpty()) {
-            "\n(Promotion! Original: ₱${item.price})"
-        } else {
-            ""
-        }
-
-        priceTagView.text = """
-            Name: ${item.name}
-            Price: ₱$finalPrice$promotionMessage
-            Rating: ${item.rating} ★
-        """.trimIndent()
+                for (doc in documents) {
+                    val itemName = doc.getString("name") ?: ""
+                    val matchScore = calculateMatchScore(text, itemName)
+                    if (matchScore > 0.5 && matchScore > highestMatchScore) {
+                        highestMatchScore = matchScore
+                        bestMatch = itemName
+                    }
+                }
+                onResult(bestMatch)
+            }
+            .addOnFailureListener {
+                Log.e(TAG, "Firestore query failed: ${it.message}")
+                onResult(null)
+            }
     }
 
-    private fun setupPriceTagMovement() {
-        priceTagView.setOnTouchListener { view, motionEvent ->
-            when (motionEvent.action) {
-                MotionEvent.ACTION_MOVE -> {
-                    view.x = motionEvent.rawX - view.width / 2
-                    view.y = motionEvent.rawY - view.height / 2
+    private fun calculateMatchScore(input: String, target: String): Double {
+        val inputWords = input.lowercase().split(" ")
+        val targetWords = target.lowercase().split(" ")
+
+        val commonWords = inputWords.intersect(targetWords)
+        return commonWords.size.toDouble() / targetWords.size
+    }
+
+    private fun processObjectDetection(bitmap: Bitmap) {
+        // Preprocess the bitmap to match the input dimensions of the TensorFlow model
+        val tensorImage = TensorImage.fromBitmap(bitmap)
+
+        // Resize the image to the dimensions expected by the model (e.g., 300x300)
+        val imageProcessor = ImageProcessor.Builder()
+            .add(ResizeOp(300, 300, ResizeOp.ResizeMethod.BILINEAR))
+            .build()
+        val processedImage = imageProcessor.process(tensorImage)
+
+        // Prepare the input buffer
+        val inputBuffer = processedImage.buffer
+
+        // Prepare an output array for model inference
+        val output = Array(1) { FloatArray(labels.size) } // Assuming one output array per label
+
+        // Run inference using the interpreter
+        interpreter.run(inputBuffer, output)
+
+        // Find the label with the highest confidence
+        val detectedIndex = output[0].indices.maxByOrNull { output[0][it] } ?: -1
+        val confidence = output[0][detectedIndex]
+        if (confidence > 0.5) {
+            val label = labels[detectedIndex]
+            Log.d(TAG, "Detected object: $label with confidence $confidence")
+            matchLabelWithFirestore(label)
+        } else {
+            Toast.makeText(this, "Unable to scan an item.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun matchLabelWithFirestore(label: String) {
+        firestore.collection("items")
+            .whereEqualTo("type", label)
+            .get()
+            .addOnSuccessListener { documents ->
+                if (documents.isEmpty) {
+                    Toast.makeText(this, "Unavailable", Toast.LENGTH_SHORT).show()
+                } else {
+                    showViewSimilarPrompt(label)
                 }
             }
-            true
-        }
+            .addOnFailureListener {
+                Log.e(TAG, "Firestore query failed: ${it.message}")
+            }
     }
 
-    override fun onPause() {
-        super.onPause()
-        stopCamera() // Shut down camera when activity is paused
+    private fun showViewSimilarPrompt(label: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Similar items found")
+            .setMessage("Would you like to view similar items?")
+            .setPositiveButton("Yes") { _, _ ->
+                redirectToShopping(label)
+            }
+            .setNegativeButton("No", null)
+            .show()
+    }
+
+    private fun redirectToShopping(searchTerm: String) {
+        val intent = Intent(this, ShoppingActivity::class.java).apply {
+            putExtra("search_term", searchTerm)
+        }
+        startActivity(intent)
+        finish()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        cameraExecutor.shutdown() // Clean up camera executor
-    }
-
-    private fun stopCamera() {
-        // Unbind camera use cases and release resources
-        cameraProviderFuture.get().unbindAll()
+        interpreter.close()
     }
 
     private fun setupBottomNav() {
@@ -196,25 +279,30 @@ class CameraActivity : AppCompatActivity() {
 
         bottomNav.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_camera -> true // Stay on the current activity
+                R.id.nav_camera -> true
                 R.id.nav_shopping -> {
-                    startActivity(Intent(this, ShoppingActivity::class.java))
+                    navigateToActivity(ShoppingActivity::class.java)
                     true
                 }
                 R.id.nav_bookmarks -> {
-                    startActivity(Intent(this, BookmarkActivity::class.java))
+                    navigateToActivity(BookmarkActivity::class.java)
                     true
                 }
                 R.id.nav_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
+                    navigateToActivity(SettingsActivity::class.java)
                     true
                 }
                 R.id.nav_chat -> {
-                    startActivity(Intent(this, ChatActivity::class.java))
+                    navigateToActivity(ChatActivity::class.java)
                     true
                 }
                 else -> false
             }
         }
+    }
+
+    private fun navigateToActivity(activityClass: Class<*>) {
+        startActivity(Intent(this, activityClass))
+        finish()
     }
 }

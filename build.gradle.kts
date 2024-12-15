@@ -4,3 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     id("com.google.gms.google-services") version "4.4.2" apply false
 }
+buildscript {
+    dependencies {
+        // Other dependencies
+        classpath("com.android.tools.build:gradle:8.1.2")
+    }
+}
