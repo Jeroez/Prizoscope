@@ -62,6 +62,9 @@ class CameraActivity : AppCompatActivity() {
         // Camera setup
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
+
+        setupBottomNav()
+
         val handlerThread = HandlerThread("CameraThread")
         handlerThread.start()
         handler = Handler(handlerThread.looper)
