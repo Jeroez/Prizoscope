@@ -5,14 +5,12 @@
     android:layout_height="match_parent"
     android:background="@color/main">
 
-    <!-- TensorFlow TextureView for object detection -->
-    <android.view.TextureView
+    <TextureView
         android:id="@+id/textureView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="Object Detection Preview" />
 
-    <!-- Price Tag -->
     <TextView
         android:id="@+id/price_text_view"
         android:layout_width="wrap_content"
@@ -25,7 +23,6 @@
         android:text="Price Tag"
         android:gravity="center" />
 
-    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"

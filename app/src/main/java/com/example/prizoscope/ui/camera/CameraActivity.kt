@@ -8,12 +8,16 @@ import android.graphics.*
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraCharacteristics
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
+import android.widget.FrameLayout
+import android.view.Gravity
+import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -33,6 +37,7 @@ import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
 import org.tensorflow.lite.support.common.FileUtil
+import org.tensorflow.lite.support.common.ops.NormalizeOp
 
 class CameraActivity : AppCompatActivity() {
 
@@ -54,15 +59,11 @@ class CameraActivity : AppCompatActivity() {
         textureView = findViewById(R.id.textureView)
         firestore = FirebaseFirestore.getInstance()
 
-        // Initialize TensorFlow Lite model and labels
         labels = FileUtil.loadLabels(this, "labels.txt")
         val model = FileUtil.loadMappedFile(this, "model.tflite")
         interpreter = Interpreter(model)
 
-        // Camera setup
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-
-
         setupBottomNav()
 
         val handlerThread = HandlerThread("CameraThread")
@@ -70,27 +71,41 @@ class CameraActivity : AppCompatActivity() {
         handler = Handler(handlerThread.looper)
 
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-            override fun onSurfaceTextureAvailable(
-                surface: SurfaceTexture,
-                width: Int,
-                height: Int
-            ) {
+            override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+                val previewSize = getOptimalPreviewSize(cameraManager, width, height)
+                val layoutParams = textureView.layoutParams as FrameLayout.LayoutParams
+                layoutParams.width = previewSize.width
+                layoutParams.height = previewSize.height
+                layoutParams.gravity = Gravity.CENTER
+                textureView.layoutParams = layoutParams
                 openCamera()
             }
 
-            override fun onSurfaceTextureSizeChanged(
-                surface: SurfaceTexture,
-                width: Int,
-                height: Int
-            ) {
+            private fun getOptimalPreviewSize(cameraManager: CameraManager, width: Int, height: Int): Size {
+                val cameraId = cameraManager.cameraIdList[0] // Assuming back camera
+                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+                val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                val sizes = map?.getOutputSizes(SurfaceTexture::class.java)
+
+                val targetRatio = width.toFloat() / height
+                return sizes?.minByOrNull {
+                    val ratio = it.width.toFloat() / it.height
+                    Math.abs(ratio - targetRatio)
+                } ?: Size(width, height)
             }
 
+            override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = false
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
                 val currentTime = System.currentTimeMillis()
-                if (currentTime - lastScanTime > 5000) { // Scan every 5 seconds
+                if (currentTime - lastScanTime > 5000) {
                     lastScanTime = currentTime
-                    val bitmap = textureView.bitmap ?: return
+                    val bitmap = textureView.bitmap
+                    if (bitmap == null) {
+                        Log.e(TAG, "Bitmap is null.")
+                        return
+                    }
+                    Log.d(TAG, "Captured bitmap size: ${bitmap.width}x${bitmap.height}")
                     processFrame(bitmap)
                 }
             }
@@ -109,8 +124,7 @@ class CameraActivity : AppCompatActivity() {
                     val surfaceTexture = textureView.surfaceTexture
                     val surface = Surface(surfaceTexture)
 
-                    val captureRequest =
-                        cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                    val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                     captureRequest.addTarget(surface)
 
                     cameraDevice.createCaptureSession(
@@ -119,13 +133,11 @@ class CameraActivity : AppCompatActivity() {
                             override fun onConfigured(session: CameraCaptureSession) {
                                 session.setRepeatingRequest(captureRequest.build(), null, null)
                             }
-
                             override fun onConfigureFailed(session: CameraCaptureSession) {}
                         },
                         handler
                     )
                 }
-
                 override fun onDisconnected(camera: CameraDevice) {}
                 override fun onError(camera: CameraDevice, error: Int) {}
             },
@@ -134,31 +146,31 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun requestCameraPermission() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 101)
         }
     }
 
     private fun processFrame(bitmap: Bitmap) {
+        processObjectDetection(bitmap) // Attempt object detection first
         processTextRecognition(bitmap) { detectedText ->
             if (detectedText.isNotEmpty()) {
                 matchTextWithFirestore(detectedText) { matchedItem ->
                     if (matchedItem != null) {
                         redirectToShopping(matchedItem)
+                    } else if (isKeyboardDetected(detectedText)) {
+                        redirectToShopping("Keyboard")
+                    } else if (isMouseDetected(detectedText)) {
+                        redirectToShopping("Mouse")
                     } else {
-                        // If no text match, fallback to object detection
-                        processObjectDetection(bitmap)
+                        Toast.makeText(this, "No matching items found.", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } else {
-                processObjectDetection(bitmap)
             }
         }
+
     }
+
 
     private fun processTextRecognition(bitmap: Bitmap, onResult: (String) -> Unit) {
         val image = InputImage.fromBitmap(bitmap, 0)
@@ -166,13 +178,44 @@ class CameraActivity : AppCompatActivity() {
 
         recognizer.process(image)
             .addOnSuccessListener { result ->
-                onResult(result.text)
+                val filteredText = result.textBlocks
+                    .joinToString(" ") { it.text }
+                    .filter { it.isLetterOrDigit() || it.isWhitespace() }
+                    .trim()
+
+                Log.d(TAG, "Filtered OCR text: $filteredText")
+
+                if (isKeyboardDetected(filteredText)) {
+                    Log.d(TAG, "Detected as a keyboard based on OCR.")
+                    redirectToShopping("Keyboard")
+                } else if (isMouseDetected(filteredText)) {
+                    Log.d(TAG, "Detected as a mouse based on OCR.")
+                    redirectToShopping("Mouse")
+                } else {
+                    onResult(filteredText)
+                }
             }
             .addOnFailureListener {
                 Log.e(TAG, "Text recognition failed: ${it.message}")
                 onResult("")
             }
     }
+
+
+    private fun isKeyboardDetected(text: String): Boolean {
+        val keywords = listOf("Shift", "Ctrl", "Alt", "CapsLk", "Tab", "Enter", "Backspace")
+        val matches = keywords.count { text.contains(it, ignoreCase = true) }
+        val textLength = text.length
+        val density = if (textLength > 0) text.split(" ").size.toDouble() / textLength else 0.0
+
+        return matches >= 3 && density > 0.05
+    }
+
+    private fun isMouseDetected(text: String): Boolean {
+        val keywords = listOf("Logitech", "DPI", "Wireless", "Gaming Mouse", "Mouse")
+        return keywords.any { text.contains(it, ignoreCase = true) }
+    }
+
 
     private fun matchTextWithFirestore(text: String, onResult: (String?) -> Unit) {
         firestore.collection("items")
@@ -200,41 +243,53 @@ class CameraActivity : AppCompatActivity() {
     private fun calculateMatchScore(input: String, target: String): Double {
         val inputWords = input.lowercase().split(" ")
         val targetWords = target.lowercase().split(" ")
-
         val commonWords = inputWords.intersect(targetWords)
         return commonWords.size.toDouble() / targetWords.size
     }
 
     private fun processObjectDetection(bitmap: Bitmap) {
-        // Preprocess the bitmap to match the input dimensions of the TensorFlow model
-        val tensorImage = TensorImage.fromBitmap(bitmap)
+        try {
+            // Step 1: Preprocess the input image
+            val inputShape = interpreter.getInputTensor(0).shape() // [1, 224, 224, 3]
+            val inputDataType = interpreter.getInputTensor(0).dataType()
 
-        // Resize the image to the dimensions expected by the model (e.g., 300x300)
-        val imageProcessor = ImageProcessor.Builder()
-            .add(ResizeOp(300, 300, ResizeOp.ResizeMethod.BILINEAR))
-            .build()
-        val processedImage = imageProcessor.process(tensorImage)
+            // Create TensorImage with the expected data type
+            val tensorImage = TensorImage(inputDataType)
+            tensorImage.load(bitmap)
 
-        // Prepare the input buffer
-        val inputBuffer = processedImage.buffer
+            // Resize and normalize the image
+            val imageProcessor = ImageProcessor.Builder()
+                .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.BILINEAR)) // Resize to 224x224
+                .add(NormalizeOp(0f, 1f)) // Normalize pixel values to [0, 1]
+                .build()
+            val processedImage = imageProcessor.process(tensorImage)
 
-        // Prepare an output array for model inference
-        val output = Array(1) { FloatArray(labels.size) } // Assuming one output array per label
+            // Step 2: Prepare the output buffer
+            val outputShape = interpreter.getOutputTensor(0).shape() // e.g., [1, 35]
+            val outputBuffer = Array(outputShape[0]) { FloatArray(outputShape[1]) }
 
-        // Run inference using the interpreter
-        interpreter.run(inputBuffer, output)
+            // Step 3: Run inference
+            interpreter.run(processedImage.buffer, outputBuffer)
 
-        // Find the label with the highest confidence
-        val detectedIndex = output[0].indices.maxByOrNull { output[0][it] } ?: -1
-        val confidence = output[0][detectedIndex]
-        if (confidence > 0.5) {
-            val label = labels[detectedIndex]
-            Log.d(TAG, "Detected object: $label with confidence $confidence")
-            matchLabelWithFirestore(label)
-        } else {
-            Toast.makeText(this, "Unable to scan an item.", Toast.LENGTH_SHORT).show()
+            // Step 4: Interpret the results
+            val detectedIndex = outputBuffer[0].indices.maxByOrNull { outputBuffer[0][it] } ?: -1
+            val confidence = outputBuffer[0][detectedIndex]
+
+            if (confidence > 0.3) {
+                val label = labels[detectedIndex]
+                Log.d(TAG, "Detected object: $label with confidence $confidence")
+                redirectToShopping(label)
+            } else {
+                Toast.makeText(this, "Unable to identify the item.", Toast.LENGTH_SHORT).show()
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during object detection: ${e.message}")
+            Toast.makeText(this, "Inference failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+
 
     private fun matchLabelWithFirestore(label: String) {
         firestore.collection("items")
@@ -242,13 +297,13 @@ class CameraActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { documents ->
                 if (documents.isEmpty) {
-                    Toast.makeText(this, "Unavailable", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "No matching items found.", Toast.LENGTH_SHORT).show()
                 } else {
                     showViewSimilarPrompt(label)
                 }
             }
             .addOnFailureListener {
-                Log.e(TAG, "Firestore query failed: ${it.message}")
+                Toast.makeText(this, "Failed to search Firestore.", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -256,9 +311,7 @@ class CameraActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Similar items found")
             .setMessage("Would you like to view similar items?")
-            .setPositiveButton("Yes") { _, _ ->
-                redirectToShopping(label)
-            }
+            .setPositiveButton("Yes") { _, _ -> redirectToShopping(label) }
             .setNegativeButton("No", null)
             .show()
     }
@@ -266,6 +319,7 @@ class CameraActivity : AppCompatActivity() {
     private fun redirectToShopping(searchTerm: String) {
         val intent = Intent(this, ShoppingActivity::class.java).apply {
             putExtra("search_term", searchTerm)
+            putExtra("auto_search", true)
         }
         startActivity(intent)
         finish()
