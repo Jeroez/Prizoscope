@@ -152,7 +152,7 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun processFrame(bitmap: Bitmap) {
-        processObjectDetection(bitmap) // Attempt object detection first
+        processObjectDetection(bitmap) // Run object detection first
         processTextRecognition(bitmap) { detectedText ->
             if (detectedText.isNotEmpty()) {
                 matchTextWithFirestore(detectedText) { matchedItem ->
@@ -160,16 +160,34 @@ class CameraActivity : AppCompatActivity() {
                         redirectToShopping(matchedItem)
                     } else if (isKeyboardDetected(detectedText)) {
                         redirectToShopping("Keyboard")
-                    } else if (isMouseDetected(detectedText)) {
-                        redirectToShopping("Mouse")
                     } else {
-                        Toast.makeText(this, "No matching items found.", Toast.LENGTH_SHORT).show()
+                        Log.d(TAG, "No matching item found in Firestore.")
                     }
                 }
             }
         }
-
     }
+
+
+    private fun isMouseDetectedByShapeOrFallback(bitmap: Bitmap): Boolean {
+        // Add a fallback or heuristic detection for mouse if model doesn't work
+        val averageBrightness = bitmap.pixelDataAverageBrightness()
+        return averageBrightness < 0.4 // Example condition: mice are often darker objects
+    }
+
+    private fun Bitmap.pixelDataAverageBrightness(): Float {
+        var totalBrightness = 0f
+        for (x in 0 until width) {
+            for (y in 0 until height) {
+                val pixel = getPixel(x, y)
+                val brightness = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3f
+                totalBrightness += brightness / 255f
+            }
+        }
+        return totalBrightness / (width * height)
+    }
+
+
 
 
     private fun processTextRecognition(bitmap: Bitmap, onResult: (String) -> Unit) {
@@ -185,21 +203,28 @@ class CameraActivity : AppCompatActivity() {
 
                 Log.d(TAG, "Filtered OCR text: $filteredText")
 
-                if (isKeyboardDetected(filteredText)) {
-                    Log.d(TAG, "Detected as a keyboard based on OCR.")
-                    redirectToShopping("Keyboard")
-                } else if (isMouseDetected(filteredText)) {
-                    Log.d(TAG, "Detected as a mouse based on OCR.")
-                    redirectToShopping("Mouse")
+                if (filteredText.isNotEmpty()) {
+                    if (isKeyboardDetected(filteredText)) {
+                        Log.d(TAG, "Detected as a keyboard based on OCR.")
+                        redirectToShopping("Keyboard")
+                    } else if (isMouseDetected(filteredText)) {
+                        Log.d(TAG, "Detected as a mouse based on OCR.")
+                        redirectToShopping("Mouse")
+                    } else {
+                        onResult(filteredText) // Pass the filtered text for further processing
+                    }
                 } else {
-                    onResult(filteredText)
+                    Log.w(TAG, "No text detected.")
+                    onResult("") // Return an empty result if no text is detected
                 }
             }
-            .addOnFailureListener {
-                Log.e(TAG, "Text recognition failed: ${it.message}")
-                onResult("")
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Text recognition failed: ${e.message}")
+                onResult("") // Handle the failure gracefully
             }
     }
+
+
 
 
     private fun isKeyboardDetected(text: String): Boolean {
@@ -213,7 +238,12 @@ class CameraActivity : AppCompatActivity() {
 
     private fun isMouseDetected(text: String): Boolean {
         val keywords = listOf("Logitech", "DPI", "Wireless", "Gaming Mouse", "Mouse")
-        return keywords.any { text.contains(it, ignoreCase = true) }
+        val matches = keywords.filter { text.contains(it, ignoreCase = true) }
+
+        Log.d(TAG, "Mouse Detection - Matched Keywords: $matches") // Debugging
+
+        // Require at least 2 matching keywords
+        return matches.size >= 2
     }
 
 
@@ -243,51 +273,61 @@ class CameraActivity : AppCompatActivity() {
     private fun calculateMatchScore(input: String, target: String): Double {
         val inputWords = input.lowercase().split(" ")
         val targetWords = target.lowercase().split(" ")
-        val commonWords = inputWords.intersect(targetWords)
-        return commonWords.size.toDouble() / targetWords.size
+        return inputWords.intersect(targetWords).size.toDouble() / targetWords.size
     }
+
+    private var lastDetectedLabel: String? = null
+    private var lastDetectionTime: Long = 0
 
     private fun processObjectDetection(bitmap: Bitmap) {
         try {
-            // Step 1: Preprocess the input image
-            val inputShape = interpreter.getInputTensor(0).shape() // [1, 224, 224, 3]
-            val inputDataType = interpreter.getInputTensor(0).dataType()
-
-            // Create TensorImage with the expected data type
-            val tensorImage = TensorImage(inputDataType)
+            // Preprocess input
+            val tensorImage = TensorImage(interpreter.getInputTensor(0).dataType())
             tensorImage.load(bitmap)
 
-            // Resize and normalize the image
             val imageProcessor = ImageProcessor.Builder()
-                .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.BILINEAR)) // Resize to 224x224
-                .add(NormalizeOp(0f, 1f)) // Normalize pixel values to [0, 1]
+                .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.BILINEAR))
+                .add(NormalizeOp(0f, 1f)) // Normalize pixel values
                 .build()
             val processedImage = imageProcessor.process(tensorImage)
 
-            // Step 2: Prepare the output buffer
-            val outputShape = interpreter.getOutputTensor(0).shape() // e.g., [1, 35]
+            // Output buffer
+            val outputShape = interpreter.getOutputTensor(0).shape()
             val outputBuffer = Array(outputShape[0]) { FloatArray(outputShape[1]) }
 
-            // Step 3: Run inference
+            // Run inference
             interpreter.run(processedImage.buffer, outputBuffer)
 
-            // Step 4: Interpret the results
+            // Interpret results
             val detectedIndex = outputBuffer[0].indices.maxByOrNull { outputBuffer[0][it] } ?: -1
             val confidence = outputBuffer[0][detectedIndex]
 
-            if (confidence > 0.3) {
+            Log.d(TAG, "Object Detection - Raw Output: ${outputBuffer[0].contentToString()}") // Debug
+            Log.d(TAG, "Object Detection - Detected Index: $detectedIndex, Confidence: $confidence")
+
+            // Confidence threshold adjustment
+            if (confidence > 0.7) { // Increased threshold
                 val label = labels[detectedIndex]
                 Log.d(TAG, "Detected object: $label with confidence $confidence")
-                redirectToShopping(label)
-            } else {
-                Toast.makeText(this, "Unable to identify the item.", Toast.LENGTH_SHORT).show()
-            }
 
+                // Avoid frequent switching
+                if (label != lastDetectedLabel || System.currentTimeMillis() - lastDetectionTime > 5000) {
+                    lastDetectedLabel = label
+                    lastDetectionTime = System.currentTimeMillis()
+                    redirectToShopping(label)
+                }
+            } else {
+                Log.w(TAG, "Low confidence: $confidence. Falling back to OCR.")
+                Toast.makeText(this, "Low confidence. Trying text recognition.", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error during object detection: ${e.message}")
             Toast.makeText(this, "Inference failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+
+
 
 
 
@@ -317,13 +357,15 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun redirectToShopping(searchTerm: String) {
+        Log.d(TAG, "Redirecting to ShoppingActivity with term: $searchTerm") // Debug log
         val intent = Intent(this, ShoppingActivity::class.java).apply {
-            putExtra("search_term", searchTerm)
-            putExtra("auto_search", true)
+            putExtra("search_term", searchTerm) // Pass the detected search term
+            putExtra("auto_search", true)      // Enable auto-search in ShoppingActivity
         }
         startActivity(intent)
         finish()
     }
+
 
     override fun onDestroy() {
         super.onDestroy()

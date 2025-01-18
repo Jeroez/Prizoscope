@@ -14,14 +14,15 @@
         android:layout_marginTop="60dp"
         android:layout_marginBottom="70dp">
 
-
         <!-- Chat Messages -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/message_list"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:scrollbars="vertical" />
+            android:scrollbars="vertical"
+            android:clipToPadding="false"
+            android:padding="8dp" /> <!-- RecyclerView will handle text and image messages -->
 
         <!-- Input Field and Send Button -->
         <LinearLayout
