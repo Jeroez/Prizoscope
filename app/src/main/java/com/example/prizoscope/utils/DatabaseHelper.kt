@@ -35,6 +35,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
                 price REAL,
+                discount_price INTEGER,
+                duration_hours INTEGER,
                 imageLink TEXT,
                 ratings REAL,
                 purchaseLink TEXT
@@ -94,9 +96,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         }
     }
 
-
-
-
     fun getAllItems(): List<Item> {
         val db = this.readableDatabase
         val cursor: Cursor = db.rawQuery("SELECT * FROM items", null)
@@ -107,9 +106,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                 val item = Item(
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
-                    price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
+                    price = cursor.getDouble(cursor.getColumnIndexOrThrow("price")),
+                    discount_price = cursor.getIntOrNull("discount_price"),
+                    duration_hours = cursor.getIntOrNull("duration_hours"),
                     img_url = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
-                    rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
+                    rating = cursor.getFloatOrNull("ratings"),
                     url = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
@@ -150,9 +151,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
                 val item = Item(
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
                     name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
-                    price = cursor.getString(cursor.getColumnIndexOrThrow("price")),
+                    price = cursor.getDouble(cursor.getColumnIndexOrThrow("price")),
+                    discount_price = cursor.getIntOrNull("discount_price"),
+                    duration_hours = cursor.getIntOrNull("duration_hours"),
                     img_url = cursor.getString(cursor.getColumnIndexOrThrow("imageLink")),
-                    rating = cursor.getString(cursor.getColumnIndexOrThrow("ratings")),
+                    rating = cursor.getFloatOrNull("ratings"),
                     url = cursor.getString(cursor.getColumnIndexOrThrow("purchaseLink"))
                 )
                 items.add(item)
@@ -184,5 +187,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, Constants.DAT
         }
     }
 
+    // SQLite helper functions for nullable numbers
+    private fun Cursor.getIntOrNull(columnName: String): Int? {
+        val index = getColumnIndexOrThrow(columnName)
+        return if (!isNull(index)) getInt(index) else null
+    }
 
+    private fun Cursor.getFloatOrNull(columnName: String): Float? {
+        val index = getColumnIndexOrThrow(columnName)
+        return if (!isNull(index)) getFloat(index) else null
+    }
 }

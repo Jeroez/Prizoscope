@@ -26,7 +26,9 @@
         android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
         tools:targetApi="35">
-<!-- for future reference... Need android.name in the application part but idk what to do ther efor now-->
+        <activity android:name="com.example.prizoscope.ui.shopping.ItemDetailActivity" />
+
+        <!-- for future reference... Need android.name in the application part but idk what to do ther efor now-->
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:exported="true" />

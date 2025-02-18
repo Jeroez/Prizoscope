@@ -108,4 +108,7 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.3")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.3")
 
+    annotationProcessor("com.github.bumptech.glide:compiler:4.12.0")
+
+
 }

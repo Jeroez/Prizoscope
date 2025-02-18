@@ -10,18 +10,18 @@ class CsvParser(private val context: Context) {
         val items = mutableListOf<Item>()
         val inputStream = context.assets.open("items.csv")
         BufferedReader(InputStreamReader(inputStream)).use { reader ->
-            reader.readLine()
+            reader.readLine() // Skip header line
             reader.forEachLine { line ->
-                val columns = line.split(",")
-                if (columns.size == 6) {
+                val columns = line.split(",").map { it.trim() }
+                if (columns.size >= 6) {
                     items.add(
                         Item(
-                            id = columns[0].trim(),
-                            name = columns[1].trim(),
-                            price = columns[2].trim().toString(),
-                            img_url = columns[3].trim(),
-                            rating = columns[4].trim().toString(),
-                            url = columns[5].trim()
+                            id = columns[0],
+                            name = columns[1],
+                            price = columns[2].toDoubleOrNull() ?: 0.0,  // Convert to Double
+                            img_url = columns[3],
+                            rating = columns[4].toFloatOrNull(),  // Convert to Float
+                            url = columns[5]
                         )
                     )
                 }

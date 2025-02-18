@@ -1,11 +1,8 @@
 package com.example.prizoscope.ui.shopping
 
-import android.app.Dialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
@@ -37,24 +34,24 @@ class ShoppingActivity : AppCompatActivity() {
         val factory = ItemViewModelFactory(itemRepository)
         itemViewModel = ViewModelProvider(this, factory).get(ItemViewModel::class.java)
 
+        // Initialize adapter – it receives an empty list initially and a click lambda
         adapter = ItemAdapter(emptyList()) { item ->
-            showItemDetailsDialog(item)
+            showItemDetails(item)
         }
-
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
 
-        // Observe items and load the RecyclerView
+        // Observe items from the ViewModel
         itemViewModel.items.observe(this) { items ->
             adapter.updateData(items)
             binding.progressBar.visibility = View.GONE
 
-            // Auto-search after items are loaded
+            // If launched with a search term, apply filtering
             val searchTerm = intent.getStringExtra("search_term")
             val autoSearch = intent.getBooleanExtra("auto_search", false)
             if (!searchTerm.isNullOrEmpty() && autoSearch) {
-                binding.searchField.setText(searchTerm) // Update the search field
-                filterItems(searchTerm)                // Trigger the search
+                binding.searchField.setText(searchTerm)
+                filterItems(searchTerm)
             }
         }
 
@@ -69,59 +66,16 @@ class ShoppingActivity : AppCompatActivity() {
             it.name.contains(query ?: "", ignoreCase = true)
         } ?: emptyList()
         adapter.updateData(filteredItems)
-        adapter.notifyDataSetChanged() // Ensure the RecyclerView refreshes
+        adapter.notifyDataSetChanged()
     }
 
-
-    private fun showItemDetailsDialog(item: Item) {
-        val dialog = Dialog(this)
-        dialog.setContentView(R.layout.dialog_item_details)
-
-        val itemName = dialog.findViewById<TextView>(R.id.item_name)
-        val itemPrice = dialog.findViewById<TextView>(R.id.item_price)
-        val itemRatings = dialog.findViewById<TextView>(R.id.item_ratings)
-        val bookmarkButton = dialog.findViewById<Button>(R.id.bookmark_button)
-        val purchaseButton = dialog.findViewById<Button>(R.id.purchase_button)
-
-        itemName.text = item.name
-        itemPrice.text = "Price: ₱${item.getEffectivePrice()}"
-        itemRatings.text = "Ratings: ${item.rating} ★"
-
-        bookmarkButton.setOnClickListener {
-            saveToBookmarks(item)
-            dialog.dismiss()
+    private fun showItemDetails(item: Item) {
+        // When an item is clicked, open the ItemDetailActivity.
+        // (Make sure that your Item class is Serializable or Parcelable as required.)
+        val intent = Intent(this, ItemDetailActivity::class.java).apply {
+            putExtra("item", item)
         }
-
-        purchaseButton.setOnClickListener {
-            val intent = Intent(this, ChatActivity::class.java)
-            intent.putExtra("imageUrl", item.img_url) // Pass the image URL
-            intent.putExtra("price", item.getEffectivePrice()) // Pass the price
-            startActivity(intent)
-        }
-
-        dialog.show()
-    }
-
-    private fun saveToBookmarks(item: Item) {
-        val sharedPreferences = getSharedPreferences("user_session", MODE_PRIVATE)
-        val username = sharedPreferences.getString("username", null)
-
-        if (username != null) {
-            val bookmarkKey = "bookmarks_$username"
-            val bookmarkJson = getSharedPreferences("bookmarks", MODE_PRIVATE).getString(bookmarkKey, "[]")
-            val bookmarks = Item.fromJsonArray(bookmarkJson ?: "[]").toMutableList()
-
-            bookmarks.add(item)
-            val updatedJson = Item.toJsonArray(bookmarks)
-
-            getSharedPreferences("bookmarks", MODE_PRIVATE).edit()
-                .putString(bookmarkKey, updatedJson)
-                .apply()
-
-            Toast.makeText(this, "Item bookmarked successfully.", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "User not logged in. Cannot save bookmarks.", Toast.LENGTH_SHORT).show()
-        }
+        startActivity(intent)
     }
 
     private fun setupBottomNav() {
