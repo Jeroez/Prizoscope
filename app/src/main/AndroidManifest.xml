@@ -6,16 +6,20 @@
         android:name="android.hardware.camera"
         android:required="true" />
 
+    <!-- Required Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+
+    <!-- Fix: Use modern storage permissions for Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
 
     <application
-        android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -26,50 +30,37 @@
         android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
         tools:targetApi="35">
+
+        <!-- Activities -->
         <activity android:name="com.example.prizoscope.ui.shopping.ItemDetailActivity" />
 
-        <!-- for future reference... Need android.name in the application part but idk what to do ther efor now-->
-        <activity
-            android:name=".ui.settings.SettingsActivity"
-            android:exported="true" />
-        <activity
-            android:name=".ui.chat.ChatActivity"
-            android:exported="true" />
-        <activity
-            android:name=".ui.bookmarks.BookmarkActivity"
-            android:exported="true" />
-        <activity
-            android:name=".ui.shopping.ShoppingActivity"
-            android:exported="true" />
-        <activity
-            android:name=".ui.camera.CameraActivity"
-            android:hardwareAccelerated="true"
-            android:exported="true" />
+        <activity android:name=".ui.settings.SettingsActivity" android:exported="true" />
+        <activity android:name=".ui.chat.ChatActivity" android:exported="true" />
+        <activity android:name=".ui.bookmarks.BookmarkActivity" android:exported="true" />
+        <activity android:name=".ui.shopping.ShoppingActivity" android:exported="true" />
+        <activity android:name=".ui.camera.CameraActivity" android:hardwareAccelerated="true" android:exported="true" />
+
         <activity
             android:name=".ui.Startup"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".ui.auth.Login"
-            android:exported="true" />
-        <activity
-            android:name=".ui.auth.Signup"
-            android:exported="true" />
-        <activity
-            android:name=".ui.MainActivity"
-            android:exported="true" />
 
+        <activity android:name=".ui.auth.Login" android:exported="true" />
+        <activity android:name=".ui.auth.Signup" android:exported="true" />
+        <activity android:name=".ui.MainActivity" android:exported="true" />
+
+        <!-- Firebase Meta-Data (Only If Using Firebase) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_launcher_foreground" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default_channel" />
+
     </application>
 
 </manifest>

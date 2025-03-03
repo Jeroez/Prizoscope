@@ -14,7 +14,7 @@
       <SelectionState runConfigName="CameraActivity">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
-      <SelectionState runConfigName="SettingsActivity">
+      <SelectionState runConfigName="ChatActivity">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>

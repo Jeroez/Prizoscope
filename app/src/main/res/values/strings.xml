@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Prizoscope</string>
+    <string name="admob_app_id">YOUR_ADMOB_APP_ID</string>
+    <string name="attach_file">Attach file</string>
 </resources>
