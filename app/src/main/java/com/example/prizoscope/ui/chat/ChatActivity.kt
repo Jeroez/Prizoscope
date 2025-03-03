@@ -2,6 +2,7 @@ package com.example.prizoscope.ui.chat
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
@@ -25,6 +26,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.storage.FirebaseStorage
 import java.util.*
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.asRequestBody
+import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 
 class ChatActivity : AppCompatActivity() {
 
@@ -106,6 +113,15 @@ class ChatActivity : AppCompatActivity() {
     private fun updateAdminDisplay() {
         findViewById<TextView>(R.id.currentAdminText).text = currentAdmin
     }
+    private fun checkAndRequestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // SDK 34+
+            requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 100)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // SDK 33 (Android 13)
+            requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 100)
+        } else { // Older Android versions
+            requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 100)
+        }
+    }
 
     // Call this function whenever admin is changed
     private fun onAdminSelected(admin: String) {
@@ -139,41 +155,28 @@ class ChatActivity : AppCompatActivity() {
         drawerLayout.closeDrawer(GravityCompat.START)
     }
 
-
-
-
-    // REST OF THE CODE REMAINS EXACTLY THE SAME AS YOUR ORIGINAL VERSION
     // Only modified sections are shown above, everything below stays unchanged
 
     private fun openImagePicker() {
+        checkAndRequestStoragePermission() // Ensure permissions before opening gallery
+
         val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
         imagePicker.launch(intent)
     }
+
+
+
 
     private val imagePicker = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.data?.let { uri ->
-                uploadImageToStorage(uri) // Upload image
+                uploadImageToDiscord(uri) // ✅ Use Discord instead
             }
         }
     }
 
-
-    private fun uploadImageToStorage(uri: Uri) {
-        val storageRef = storage.reference.child("chat_images/${UUID.randomUUID()}")
-
-        storageRef.putFile(uri)
-            .addOnSuccessListener { taskSnapshot ->
-                storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    sendMessage(downloadUri.toString(), isImage = true) // Send URL in chat
-                }
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Image upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-    }
 
 
 
@@ -250,6 +253,67 @@ class ChatActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun uploadImageToDiscord(uri: Uri) {
+        val discordWebhookUrl = "https://discord.com/api/webhooks/1346122904760352898/OBw8Uft9dyDyw0XJU2vP89Qk0-_1NRJJctF3QwmSKUfSyt-6h8sB454q0DjseneLHF9-" //  webhook URL
+
+        // Convert Uri to File
+        val file = File(getRealPathFromURI(uri)!!)
+        if (!file.exists()) {
+            Log.e("DiscordUpload", "File does not exist: ${file.path}")
+            Toast.makeText(this, "File error: Image not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", file.name, file.asRequestBody("image/jpeg".toMediaTypeOrNull()))
+            .build()
+
+        val request = Request.Builder()
+            .url(discordWebhookUrl)
+            .post(requestBody)
+            .build()
+
+        val client = OkHttpClient()
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e("DiscordUpload", "Upload failed: ${e.message}")
+                runOnUiThread {
+                    Toast.makeText(this@ChatActivity, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val responseBody = response.body?.string()
+                Log.d("DiscordUpload", "Response: $responseBody")
+
+                try {
+                    val jsonResponse = JSONObject(responseBody ?: "{}")
+                    val imageUrl = jsonResponse.getJSONArray("attachments").getJSONObject(0).getString("url")
+
+                    runOnUiThread {
+                        sendMessage(imageUrl, isImage = true)  // ✅ Send URL in chat
+                    }
+                } catch (e: Exception) {
+                    Log.e("DiscordUpload", "Error parsing response: ${e.message}")
+                    runOnUiThread {
+                        Toast.makeText(this@ChatActivity, "Upload failed", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        })
+    }
+
+    private fun getRealPathFromURI(uri: Uri): String? {
+        val projection = arrayOf(MediaStore.Images.Media.DATA)
+        contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            val columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+            cursor.moveToFirst()
+            return cursor.getString(columnIndex)
+        }
+        return null
     }
 
 
