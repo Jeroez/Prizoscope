@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,15 +39,6 @@ class ChatActivity : AppCompatActivity() {
     private var currentMessageNumber = 0L
     private lateinit var drawerLayout: DrawerLayout
 
-    private val imagePicker = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { uri ->
-                uploadImageToStorage(uri)
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,7 +74,7 @@ class ChatActivity : AppCompatActivity() {
         }
 
         findViewById<ImageButton>(R.id.btn_attach).setOnClickListener {
-            openImagePicker()
+            openImagePicker() // Open gallery
         }
 
         findViewById<Button>(R.id.btn_send).setOnClickListener {
@@ -93,6 +85,7 @@ class ChatActivity : AppCompatActivity() {
             }
         }
     }
+
 
     private fun loadAdmins() {
         firestore.collection("admins").get()
@@ -106,15 +99,47 @@ class ChatActivity : AppCompatActivity() {
                 val recyclerView = findViewById<RecyclerView>(R.id.admin_list)
                 recyclerView.layoutManager = LinearLayoutManager(this)
                 recyclerView.adapter = AdminAdapter(adminList) { selectedAdmin ->
-                    currentAdmin = selectedAdmin
-                    getSharedPreferences("chat_prefs", MODE_PRIVATE).edit()
-                        .putString("last_admin", currentAdmin)
-                        .apply()
-                    openAdminChat(currentAdmin)
-                    drawerLayout.closeDrawer(GravityCompat.START)
+                    onAdminSelected(selectedAdmin)
                 }
             }
     }
+    private fun updateAdminDisplay() {
+        findViewById<TextView>(R.id.currentAdminText).text = currentAdmin
+    }
+
+    // Call this function whenever admin is changed
+    private fun onAdminSelected(admin: String) {
+        currentAdmin = admin
+        getSharedPreferences("chat_prefs", MODE_PRIVATE).edit()
+            .putString("last_admin", currentAdmin)
+            .apply()
+
+        currentChatId = "$userName | $currentAdmin"
+        updateAdminDisplay()
+
+        firestore.collection("chats").document(currentChatId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    openAdminChat(currentAdmin)
+                } else {
+                    firestore.collection("chats").document(currentChatId)
+                        .set(hashMapOf<String, Any>())
+                        .addOnSuccessListener {
+                            openAdminChat(currentAdmin)
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Error creating chat: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Error checking chat: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+
+        drawerLayout.closeDrawer(GravityCompat.START)
+    }
+
+
 
 
     // REST OF THE CODE REMAINS EXACTLY THE SAME AS YOUR ORIGINAL VERSION
@@ -125,18 +150,32 @@ class ChatActivity : AppCompatActivity() {
         imagePicker.launch(intent)
     }
 
+    private val imagePicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.data?.let { uri ->
+                uploadImageToStorage(uri) // Upload image
+            }
+        }
+    }
+
+
     private fun uploadImageToStorage(uri: Uri) {
         val storageRef = storage.reference.child("chat_images/${UUID.randomUUID()}")
+
         storageRef.putFile(uri)
-            .addOnSuccessListener {
+            .addOnSuccessListener { taskSnapshot ->
                 storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    sendMessage(downloadUri.toString(), isImage = true)
+                    sendMessage(downloadUri.toString(), isImage = true) // Send URL in chat
                 }
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Image upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
+
 
     private fun fetchUserName(): String {
         return getSharedPreferences("user_session", MODE_PRIVATE).getString("username", null) ?: run {
@@ -175,27 +214,32 @@ class ChatActivity : AppCompatActivity() {
                 snapshot?.data?.let { data ->
                     messages.clear()
                     data.entries.sortedBy { it.key }.forEach { (key, value) ->
-                        val msg = value as Map<*, *>
-                        messages.add(Message(
-                            sender = msg["sender"].toString(),
-                            text = msg["content"]?.toString(),
-                            imageUrl = if (msg["type"] == "image") msg["content"]?.toString() else null,
-                            timestamp = (msg["timestamp"] as? Long) ?: 0L,
-                            adminUsername = null,
-                            adminStore = null,
-                            isSuperAdmin = null
-                        ))
+                        if (value is Map<*, *>) {
+                            messages.add(Message(
+                                sender = value["sender"].toString(),
+                                text = value["content"]?.toString(),
+                                imageUrl = if (value["type"] == "image") value["content"]?.toString() else null,
+                                timestamp = (value["timestamp"] as? Long) ?: 0L,
+                                adminUsername = null,
+                                adminStore = null,
+                                isSuperAdmin = null
+                            ))
+                        } else {
+                            Log.e("ChatActivity", "Unexpected Firestore data format for message: $value")
+                        }
                     }
                     messageAdapter.notifyDataSetChanged()
                 }
             }
+
     }
 
     private fun sendMessage(content: String, isImage: Boolean = false) {
         val timestamp = System.currentTimeMillis()
         val messageKey = "message_${currentMessageNumber++}"
+
         val messageData = hashMapOf(
-            "content" to content,
+            "content" to content,  // This will be the image URL if it's an image
             "sender" to "user",
             "timestamp" to timestamp,
             "type" to if (isImage) "image" else "text"
@@ -207,6 +251,8 @@ class ChatActivity : AppCompatActivity() {
                 Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
             }
     }
+
+
 
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)

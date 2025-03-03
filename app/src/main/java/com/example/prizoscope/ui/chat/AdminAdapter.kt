@@ -8,8 +8,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.prizoscope.R
 
 class AdminAdapter(
-    private val adminList: List<String>,  // Updated to List<String>
-    private val onAdminSelected: (String) -> Unit  // Callback now takes a String
+    private val adminList: List<String>,
+    private val onAdminSelected: (String) -> Unit
 ) : RecyclerView.Adapter<AdminAdapter.AdminViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AdminViewHolder {
@@ -19,16 +19,16 @@ class AdminAdapter(
     }
 
     override fun onBindViewHolder(holder: AdminViewHolder, position: Int) {
-        val adminName = adminList[position]
-        holder.adminName.text = adminName  // Set text to admin name
+        val admin = adminList[position]
+        holder.adminName.text = admin
         holder.itemView.setOnClickListener {
-            onAdminSelected(adminName)  // Pass selected admin name
+            onAdminSelected(admin)
         }
     }
 
     override fun getItemCount() = adminList.size
 
     class AdminViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val adminName: TextView = itemView.findViewById(R.id.admin_name)  // Ensure this ID exists in item_admin.xml
+        val adminName: TextView = itemView.findViewById(R.id.admin_name)
     }
 }
