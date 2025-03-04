@@ -60,17 +60,32 @@ class ItemDetailActivity : AppCompatActivity() {
 
         binding.purchaseButton.setOnClickListener {
             val storeName = currentItem.store
-            Log.d("FirestoreDebug", "Store Name: $storeName") //  Debug log
-
             if (storeName.isNullOrEmpty()) {
                 Toast.makeText(this, "Error: Store not found.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
+            // Send image URL to Firestore
+            val username = getSharedPreferences("user_session", MODE_PRIVATE)
+                .getString("username", "") ?: ""
+            val chatId = "$username | $storeName"
+
+            firestore.collection("chats").document(chatId).get().addOnSuccessListener { doc ->
+                val nextMsgNum = (doc.data?.size ?: 0).toLong()
+                val messageData = hashMapOf(
+                    "content" to currentItem.img_url,
+                    "sender" to "system",
+                    "timestamp" to System.currentTimeMillis(),
+                    "type" to "image"
+                )
+                firestore.collection("chats").document(chatId)
+                    .update("message_$nextMsgNum", messageData)
+            }
+
+            // Open ChatActivity
             val intent = Intent(this, ChatActivity::class.java).apply {
-                putExtra("storeName", storeName)
-                putExtra("imageUrl", currentItem.img_url)
-                putExtra("price", currentItem.getEffectivePrice())
+                putExtra("admin_name", storeName)
+                putExtra("from_shopping", true)
             }
             startActivity(intent)
         }
@@ -93,7 +108,7 @@ class ItemDetailActivity : AppCompatActivity() {
 
         firestore.collection("Reviews")
             .whereEqualTo("itemName", currentItem.name)
-            .whereEqualTo("Store", currentItem.store) // Ensure case matches Firestore field name
+            .whereEqualTo("store", currentItem.store) // Ensure case matches Firestore field name
             .get()
             .addOnSuccessListener { snapshots ->
                 if (snapshots.isEmpty) {
@@ -174,7 +189,7 @@ class ItemDetailActivity : AppCompatActivity() {
     }
     private fun setupBottomNav() {
         val bottomNav = binding.bottomNav
-        bottomNav.selectedItemId = R.id.nav_chat
+        bottomNav.selectedItemId = R.id.nav_shopping
 
         bottomNav.setOnItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
@@ -194,7 +209,10 @@ class ItemDetailActivity : AppCompatActivity() {
                     navigateToActivity(SettingsActivity::class.java)
                     true
                 }
-                R.id.nav_chat -> true
+                R.id.nav_chat -> {
+                    navigateToActivity(ChatActivity::class.java)
+                    true
+                }
                 else -> false
             }
         }

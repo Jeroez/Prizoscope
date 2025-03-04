@@ -26,16 +26,6 @@
                 android:layout_gravity="center_horizontal"
                 android:paddingBottom="24dp" />
 
-            <!-- Theme Switch -->
-            <Switch
-                android:id="@+id/switch_theme"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Enable Light Mode"
-                android:textSize="25sp"
-                android:textColor="@color/aqua"
-                android:padding="8dp"
-                app:useMaterialThemeColors="true" />
 
             <!-- Notifications Switch -->
             <Switch

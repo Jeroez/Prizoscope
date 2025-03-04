@@ -35,7 +35,6 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
 
         // Initialize Views
-        themeSwitch = findViewById(R.id.switch_theme)
         logoutButton = findViewById(R.id.logout_button)
         notificationsSwitch = findViewById(R.id.switch_notifications)
         resetButton = findViewById(R.id.reset_button)
