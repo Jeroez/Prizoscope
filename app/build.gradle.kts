@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.play.services.mlkit.text.recognition)
     implementation(libs.play.services.location)
+    implementation(libs.volley)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -78,6 +79,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.preference)
     implementation(libs.guava)
+
 
 
 
@@ -110,5 +112,10 @@ dependencies {
 
     annotationProcessor("com.github.bumptech.glide:compiler:4.12.0")
 
-
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    implementation("com.github.bumptech.glide:glide:4.16.0")  // For image loading
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2") // For coroutines support
 }

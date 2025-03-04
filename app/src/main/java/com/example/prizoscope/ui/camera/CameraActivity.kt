@@ -20,6 +20,7 @@ import android.view.Gravity
 import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.prizoscope.R
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -27,17 +28,22 @@ import com.example.prizoscope.ui.shopping.ShoppingActivity
 import com.example.prizoscope.ui.settings.SettingsActivity
 import com.example.prizoscope.ui.bookmarks.BookmarkActivity
 import com.example.prizoscope.ui.chat.ChatActivity
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.image.ImageProcessor
-import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
 import org.tensorflow.lite.support.common.FileUtil
-import org.tensorflow.lite.support.common.ops.NormalizeOp
+import java.io.ByteArrayOutputStream
+import java.io.File
+import com.example.prizoscope.api.RetrofitClient
+import com.example.prizoscope.api.ObjectDetectionResponse
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class CameraActivity : AppCompatActivity() {
 
@@ -72,33 +78,15 @@ class CameraActivity : AppCompatActivity() {
 
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-                val previewSize = getOptimalPreviewSize(cameraManager, width, height)
-                val layoutParams = textureView.layoutParams as FrameLayout.LayoutParams
-                layoutParams.width = previewSize.width
-                layoutParams.height = previewSize.height
-                layoutParams.gravity = Gravity.CENTER
-                textureView.layoutParams = layoutParams
-                openCamera()
-            }
-
-            private fun getOptimalPreviewSize(cameraManager: CameraManager, width: Int, height: Int): Size {
-                val cameraId = cameraManager.cameraIdList[0] // Assuming back camera
-                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-                val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                val sizes = map?.getOutputSizes(SurfaceTexture::class.java)
-
-                val targetRatio = width.toFloat() / height
-                return sizes?.minByOrNull {
-                    val ratio = it.width.toFloat() / it.height
-                    Math.abs(ratio - targetRatio)
-                } ?: Size(width, height)
+                // Request camera permission when the surface is available
+                requestCameraPermission()
             }
 
             override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = false
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
                 val currentTime = System.currentTimeMillis()
-                if (currentTime - lastScanTime > 5000) {
+                if (currentTime - lastScanTime > 5000) { // Process frames every 5 seconds
                     lastScanTime = currentTime
                     val bitmap = textureView.bitmap
                     if (bitmap == null) {
@@ -110,85 +98,180 @@ class CameraActivity : AppCompatActivity() {
                 }
             }
         }
-
-        requestCameraPermission()
     }
 
     @SuppressLint("MissingPermission")
     private fun openCamera() {
-        cameraManager.openCamera(
-            cameraManager.cameraIdList[0],
-            object : CameraDevice.StateCallback() {
-                override fun onOpened(camera: CameraDevice) {
-                    cameraDevice = camera
-                    val surfaceTexture = textureView.surfaceTexture
-                    val surface = Surface(surfaceTexture)
+        try {
+            if (cameraManager.cameraIdList.isEmpty()) {
+                Log.e(TAG, "No cameras available.")
+                Toast.makeText(this, "No cameras available.", Toast.LENGTH_SHORT).show()
+                return
+            }
 
-                    val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                    captureRequest.addTarget(surface)
+            val cameraId = cameraManager.cameraIdList[0] // Assuming back camera
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            val sizes = map?.getOutputSizes(SurfaceTexture::class.java)
 
-                    cameraDevice.createCaptureSession(
-                        listOf(surface),
-                        object : CameraCaptureSession.StateCallback() {
-                            override fun onConfigured(session: CameraCaptureSession) {
-                                session.setRepeatingRequest(captureRequest.build(), null, null)
-                            }
-                            override fun onConfigureFailed(session: CameraCaptureSession) {}
-                        },
-                        handler
-                    )
-                }
-                override fun onDisconnected(camera: CameraDevice) {}
-                override fun onError(camera: CameraDevice, error: Int) {}
-            },
-            handler
-        )
+            // Choose the optimal preview size
+            val previewSize = sizes?.maxByOrNull { it.width * it.height } ?: Size(1920, 1080)
+
+            // Adjust TextureView layout to match the preview size
+            val layoutParams = textureView.layoutParams as FrameLayout.LayoutParams
+            layoutParams.width = previewSize.width
+            layoutParams.height = previewSize.height
+            layoutParams.gravity = Gravity.CENTER
+            textureView.layoutParams = layoutParams
+
+            // Open the camera
+            cameraManager.openCamera(
+                cameraId,
+                object : CameraDevice.StateCallback() {
+                    override fun onOpened(camera: CameraDevice) {
+                        cameraDevice = camera
+                        val surfaceTexture = textureView.surfaceTexture
+                        if (surfaceTexture == null) {
+                            Log.e(TAG, "SurfaceTexture is null.")
+                            return
+                        }
+
+                        // Set the default buffer size
+                        surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
+
+                        // Create a Surface for the preview
+                        val surface = Surface(surfaceTexture)
+
+                        // Create a capture request
+                        val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                        captureRequest.addTarget(surface)
+
+                        // Create a camera capture session
+                        cameraDevice.createCaptureSession(
+                            listOf(surface),
+                            object : CameraCaptureSession.StateCallback() {
+                                override fun onConfigured(session: CameraCaptureSession) {
+                                    session.setRepeatingRequest(captureRequest.build(), null, null)
+                                }
+
+                                override fun onConfigureFailed(session: CameraCaptureSession) {
+                                    Log.e(TAG, "Camera capture session configuration failed.")
+                                }
+                            },
+                            handler
+                        )
+                    }
+
+                    override fun onDisconnected(camera: CameraDevice) {
+                        Log.e(TAG, "Camera device disconnected.")
+                    }
+
+                    override fun onError(camera: CameraDevice, error: Int) {
+                        Log.e(TAG, "Camera device error: $error")
+                    }
+                },
+                handler
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening camera: ${e.message}")
+            Toast.makeText(this, "Error opening camera: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun requestCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 101)
+            // Request the camera permission
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.CAMERA), 101)
+        } else {
+            // Permission already granted, open the camera
+            openCamera()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // Permission granted, open the camera
+            openCamera()
+        } else {
+            // Permission denied, show a message to the user
+            Toast.makeText(this, "Camera permission is required to use this feature.", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun processFrame(bitmap: Bitmap) {
-        processObjectDetection(bitmap) // Run object detection first
-        processTextRecognition(bitmap) { detectedText ->
-            if (detectedText.isNotEmpty()) {
-                matchTextWithFirestore(detectedText) { matchedItem ->
-                    if (matchedItem != null) {
-                        redirectToShopping(matchedItem)
-                    } else if (isKeyboardDetected(detectedText)) {
-                        redirectToShopping("Keyboard")
-                    } else {
-                        Log.d(TAG, "No matching item found in Firestore.")
+        try {
+            processObjectDetection(bitmap)
+            processTextRecognition(bitmap) { detectedText ->
+                if (detectedText.isNotEmpty()) {
+                    matchTextWithFirestore(detectedText) { matchedItem ->
+                        if (matchedItem != null) {
+                            redirectToShopping(matchedItem)
+                        } else if (isKeyboardDetected(detectedText)) {
+                            redirectToShopping("Keyboard")
+                        } else {
+                            Log.d(TAG, "No matching item found in Firestore.")
+                        }
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in processFrame: ${e.message}")
+            Toast.makeText(this, "Error processing frame: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+            bitmap.recycle() // Recycle the bitmap to free memory
         }
     }
 
+    private fun processObjectDetection(bitmap: Bitmap) {
+        try {
+            // Convert bitmap to byte array
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
 
-    private fun isMouseDetectedByShapeOrFallback(bitmap: Bitmap): Boolean {
-        // Add a fallback or heuristic detection for mouse if model doesn't work
-        val averageBrightness = bitmap.pixelDataAverageBrightness()
-        return averageBrightness < 0.4 // Example condition: mice are often darker objects
-    }
+            // Create a file from the byte array
+            val file = File.createTempFile("image", ".jpg", cacheDir)
+            file.writeBytes(byteArray)
 
-    private fun Bitmap.pixelDataAverageBrightness(): Float {
-        var totalBrightness = 0f
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                val pixel = getPixel(x, y)
-                val brightness = (Color.red(pixel) + Color.green(pixel) + Color.blue(pixel)) / 3f
-                totalBrightness += brightness / 255f
-            }
+            // Create a MultipartBody.Part
+            val requestFile = RequestBody.create("image/jpeg".toMediaTypeOrNull(), file)
+            val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
+
+            // Send the image to the API
+            RetrofitClient.instance.detectObjects(body).enqueue(object : Callback<ObjectDetectionResponse> {
+                override fun onResponse(call: Call<ObjectDetectionResponse>, response: Response<ObjectDetectionResponse>) {
+                    if (response.isSuccessful) {
+                        val detectedObjects = response.body()?.objects
+                        if (!detectedObjects.isNullOrEmpty()) {
+                            val bestMatch = detectedObjects.maxByOrNull { it.confidence }
+                            if (bestMatch != null && bestMatch.confidence > 0.7) {
+                                Log.d(TAG, "Detected object: ${bestMatch.label} with confidence ${bestMatch.confidence}")
+                                redirectToShopping(bestMatch.label)
+                            } else {
+                                Log.w(TAG, "Low confidence. Falling back to OCR.")
+                                Toast.makeText(this@CameraActivity, "Low confidence. Trying text recognition.", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Log.w(TAG, "No objects detected.")
+                            Toast.makeText(this@CameraActivity, "No objects detected.", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Log.e(TAG, "API call failed: ${response.errorBody()?.string()}")
+                        Toast.makeText(this@CameraActivity, "API call failed.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onFailure(call: Call<ObjectDetectionResponse>, t: Throwable) {
+                    Log.e(TAG, "API call failed: ${t.message}")
+                    Toast.makeText(this@CameraActivity, "API call failed: ${t.message}", Toast.LENGTH_SHORT).show()
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in processObjectDetection: ${e.message}")
+            Toast.makeText(this, "Error processing image: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-        return totalBrightness / (width * height)
     }
-
-
-
 
     private fun processTextRecognition(bitmap: Bitmap, onResult: (String) -> Unit) {
         val image = InputImage.fromBitmap(bitmap, 0)
@@ -224,9 +307,6 @@ class CameraActivity : AppCompatActivity() {
             }
     }
 
-
-
-
     private fun isKeyboardDetected(text: String): Boolean {
         val keywords = listOf("Shift", "Ctrl", "Alt", "CapsLk", "Tab", "Enter", "Backspace")
         val matches = keywords.count { text.contains(it, ignoreCase = true) }
@@ -245,7 +325,6 @@ class CameraActivity : AppCompatActivity() {
         // Require at least 2 matching keywords
         return matches.size >= 2
     }
-
 
     private fun matchTextWithFirestore(text: String, onResult: (String?) -> Unit) {
         firestore.collection("items")
@@ -276,86 +355,6 @@ class CameraActivity : AppCompatActivity() {
         return inputWords.intersect(targetWords).size.toDouble() / targetWords.size
     }
 
-    private var lastDetectedLabel: String? = null
-    private var lastDetectionTime: Long = 0
-
-    private fun processObjectDetection(bitmap: Bitmap) {
-        try {
-            // Preprocess input
-            val tensorImage = TensorImage(interpreter.getInputTensor(0).dataType())
-            tensorImage.load(bitmap)
-
-            val imageProcessor = ImageProcessor.Builder()
-                .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.BILINEAR))
-                .add(NormalizeOp(0f, 1f)) // Normalize pixel values
-                .build()
-            val processedImage = imageProcessor.process(tensorImage)
-
-            // Output buffer
-            val outputShape = interpreter.getOutputTensor(0).shape()
-            val outputBuffer = Array(outputShape[0]) { FloatArray(outputShape[1]) }
-
-            // Run inference
-            interpreter.run(processedImage.buffer, outputBuffer)
-
-            // Interpret results
-            val detectedIndex = outputBuffer[0].indices.maxByOrNull { outputBuffer[0][it] } ?: -1
-            val confidence = outputBuffer[0][detectedIndex]
-
-            Log.d(TAG, "Object Detection - Raw Output: ${outputBuffer[0].contentToString()}") // Debug
-            Log.d(TAG, "Object Detection - Detected Index: $detectedIndex, Confidence: $confidence")
-
-            // Confidence threshold adjustment
-            if (confidence > 0.7) { // Increased threshold
-                val label = labels[detectedIndex]
-                Log.d(TAG, "Detected object: $label with confidence $confidence")
-
-                // Avoid frequent switching
-                if (label != lastDetectedLabel || System.currentTimeMillis() - lastDetectionTime > 5000) {
-                    lastDetectedLabel = label
-                    lastDetectionTime = System.currentTimeMillis()
-                    redirectToShopping(label)
-                }
-            } else {
-                Log.w(TAG, "Low confidence: $confidence. Falling back to OCR.")
-                Toast.makeText(this, "Low confidence. Trying text recognition.", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error during object detection: ${e.message}")
-            Toast.makeText(this, "Inference failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-
-
-
-
-
-    private fun matchLabelWithFirestore(label: String) {
-        firestore.collection("items")
-            .whereEqualTo("type", label)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (documents.isEmpty) {
-                    Toast.makeText(this, "No matching items found.", Toast.LENGTH_SHORT).show()
-                } else {
-                    showViewSimilarPrompt(label)
-                }
-            }
-            .addOnFailureListener {
-                Toast.makeText(this, "Failed to search Firestore.", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun showViewSimilarPrompt(label: String) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Similar items found")
-            .setMessage("Would you like to view similar items?")
-            .setPositiveButton("Yes") { _, _ -> redirectToShopping(label) }
-            .setNegativeButton("No", null)
-            .show()
-    }
-
     private fun redirectToShopping(searchTerm: String) {
         Log.d(TAG, "Redirecting to ShoppingActivity with term: $searchTerm") // Debug log
         val intent = Intent(this, ShoppingActivity::class.java).apply {
@@ -365,7 +364,6 @@ class CameraActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
-
 
     override fun onDestroy() {
         super.onDestroy()
