@@ -8,20 +8,56 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@color/main"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/main">
+        android:padding="16dp">
 
         <EditText
             android:id="@+id/search_field"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Search for items"
-            android:background="@color/white"
-            android:padding="8dp"
             android:layout_marginTop="60dp"
+            android:background="@color/white"
+            android:hint="Search for items"
             android:imeOptions="actionSearch"
-            android:inputType="text" />
+            android:inputType="text"
+            android:padding="8dp" />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Spinner
+                android:id="@+id/sortSpinner"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@color/white"
+                android:paddingEnd="10dp"
+                android:layout_marginRight="00dp"/>
+
+            <ImageButton
+                android:id="@+id/sortOrderButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@null"
+                android:padding="8dp"
+                android:src="@drawable/down"
+                android:contentDescription="Toggle sort order"/>
+
+            <EditText
+                android:id="@+id/priceFilter"
+                android:layout_width="1dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@color/white"
+                android:hint="Budget"
+                android:inputType="number"
+                android:padding="8dp" />
+        </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_view"
@@ -34,8 +70,8 @@
             android:id="@+id/progress_bar"
             android:layout_width="200dp"
             android:layout_height="50dp"
-            android:layout_marginTop="-300px"
             android:layout_gravity="center"
+            android:layout_marginTop="-300px"
             android:visibility="gone" />
     </LinearLayout>
 
