@@ -15,8 +15,6 @@ import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
-import android.widget.FrameLayout
-import android.view.Gravity
 import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -33,17 +31,21 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
 import java.io.ByteArrayOutputStream
-import java.io.File
 import com.example.prizoscope.api.RetrofitClient
 import com.example.prizoscope.api.ObjectDetectionResponse
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import android.util.Base64
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import com.example.prizoscope.BuildConfig
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import java.io.File
 
 class CameraActivity : AppCompatActivity() {
 
@@ -76,82 +78,67 @@ class CameraActivity : AppCompatActivity() {
         handlerThread.start()
         handler = Handler(handlerThread.looper)
 
+        requestCameraPermission() // ✅ Request permissions at the start
+
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-                // Request camera permission when the surface is available
-                requestCameraPermission()
+                if (ContextCompat.checkSelfPermission(
+                        this@CameraActivity, android.Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    openCamera()
+                }
             }
-
             override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = false
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
                 val currentTime = System.currentTimeMillis()
-                if (currentTime - lastScanTime > 5000) { // Process frames every 5 seconds
+                if (currentTime - lastScanTime > 5000) {
                     lastScanTime = currentTime
-                    val bitmap = textureView.bitmap
-                    if (bitmap == null) {
-                        Log.e(TAG, "Bitmap is null.")
-                        return
-                    }
-                    Log.d(TAG, "Captured bitmap size: ${bitmap.width}x${bitmap.height}")
-                    processFrame(bitmap)
+                    textureView.bitmap?.let { processFrame(it) }
                 }
             }
         }
     }
 
+
     @SuppressLint("MissingPermission")
     private fun openCamera() {
         try {
-            if (cameraManager.cameraIdList.isEmpty()) {
+            val cameraId = cameraManager.cameraIdList.firstOrNull() ?: run {
                 Log.e(TAG, "No cameras available.")
                 Toast.makeText(this, "No cameras available.", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            val cameraId = cameraManager.cameraIdList[0] // Assuming back camera
+            if (!::textureView.isInitialized || textureView.surfaceTexture == null) {
+                Log.e(TAG, "TextureView is not initialized or its SurfaceTexture is null.")
+                return
+            }
+
+            val surfaceTexture = textureView.surfaceTexture!!
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-            val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-            val sizes = map?.getOutputSizes(SurfaceTexture::class.java)
+            val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                ?.getOutputSizes(SurfaceTexture::class.java)
 
-            // Choose the optimal preview size
             val previewSize = sizes?.maxByOrNull { it.width * it.height } ?: Size(1920, 1080)
+            surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
+            val surface = Surface(surfaceTexture)
 
-            // Adjust TextureView layout to match the preview size
-            val layoutParams = textureView.layoutParams as FrameLayout.LayoutParams
-            layoutParams.width = previewSize.width
-            layoutParams.height = previewSize.height
-            layoutParams.gravity = Gravity.CENTER
-            textureView.layoutParams = layoutParams
+            cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    cameraDevice = camera // Ensure cameraDevice is assigned before use
 
-            // Open the camera
-            cameraManager.openCamera(
-                cameraId,
-                object : CameraDevice.StateCallback() {
-                    override fun onOpened(camera: CameraDevice) {
-                        cameraDevice = camera
-                        val surfaceTexture = textureView.surfaceTexture
-                        if (surfaceTexture == null) {
-                            Log.e(TAG, "SurfaceTexture is null.")
-                            return
+                    try {
+                        val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                            addTarget(surface)
                         }
 
-                        // Set the default buffer size
-                        surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
-
-                        // Create a Surface for the preview
-                        val surface = Surface(surfaceTexture)
-
-                        // Create a capture request
-                        val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                        captureRequest.addTarget(surface)
-
-                        // Create a camera capture session
                         cameraDevice.createCaptureSession(
                             listOf(surface),
                             object : CameraCaptureSession.StateCallback() {
                                 override fun onConfigured(session: CameraCaptureSession) {
-                                    session.setRepeatingRequest(captureRequest.build(), null, null)
+                                    session.setRepeatingRequest(captureRequest.build(), null, handler)
                                 }
 
                                 override fun onConfigureFailed(session: CameraCaptureSession) {
@@ -160,23 +147,29 @@ class CameraActivity : AppCompatActivity() {
                             },
                             handler
                         )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error creating capture session: ${e.message}")
                     }
+                }
 
-                    override fun onDisconnected(camera: CameraDevice) {
-                        Log.e(TAG, "Camera device disconnected.")
-                    }
+                override fun onDisconnected(camera: CameraDevice) {
+                    Log.e(TAG, "Camera device disconnected.")
+                    camera.close()
+                }
 
-                    override fun onError(camera: CameraDevice, error: Int) {
-                        Log.e(TAG, "Camera device error: $error")
-                    }
-                },
-                handler
-            )
+                override fun onError(camera: CameraDevice, error: Int) {
+                    Log.e(TAG, "Camera device error: $error")
+                    camera.close()
+                }
+            }, handler)
+
         } catch (e: Exception) {
             Log.e(TAG, "Error opening camera: ${e.message}")
             Toast.makeText(this, "Error opening camera: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+
 
     private fun requestCameraPermission() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -222,6 +215,8 @@ class CameraActivity : AppCompatActivity() {
             bitmap.recycle() // Recycle the bitmap to free memory
         }
     }
+
+    private var lastDetectedObject: String? = null
 
     private fun processObjectDetection(bitmap: Bitmap) {
         try {
@@ -272,6 +267,17 @@ class CameraActivity : AppCompatActivity() {
             Toast.makeText(this, "Error processing image: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+
+
+
+    private fun convertBitmapToBase64(bitmap: Bitmap): String {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+        return Base64.encodeToString(byteArrayOutputStream.toByteArray(), Base64.NO_WRAP)
+    }
+
+
 
     private fun processTextRecognition(bitmap: Bitmap, onResult: (String) -> Unit) {
         val image = InputImage.fromBitmap(bitmap, 0)
@@ -355,15 +361,25 @@ class CameraActivity : AppCompatActivity() {
         return inputWords.intersect(targetWords).size.toDouble() / targetWords.size
     }
 
+    private var lastRedirectTime = 0L
+
     private fun redirectToShopping(searchTerm: String) {
-        Log.d(TAG, "Redirecting to ShoppingActivity with term: $searchTerm") // Debug log
+        val currentTime = System.currentTimeMillis()
+
+        if (currentTime - lastRedirectTime < 5000) { // Prevent multiple redirects within 5 seconds
+            return
+        }
+
+        lastRedirectTime = currentTime
+        Log.d(TAG, "Redirecting to ShoppingActivity with term: $searchTerm")
+
         val intent = Intent(this, ShoppingActivity::class.java).apply {
-            putExtra("search_term", searchTerm) // Pass the detected search term
-            putExtra("auto_search", true)      // Enable auto-search in ShoppingActivity
+            putExtra("search_term", searchTerm)
+            putExtra("auto_search", true)
         }
         startActivity(intent)
-        finish()
     }
+
 
     override fun onDestroy() {
         super.onDestroy()
