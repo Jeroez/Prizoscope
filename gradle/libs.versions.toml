@@ -23,6 +23,7 @@ guava = "31.1-android"
 playServicesMlkitTextRecognition = "19.0.1"
 playServicesLocation = "21.3.0"
 volley = "1.2.1"
+firebaseStorageKtx = "21.0.1"
 
 
 
@@ -56,6 +57,7 @@ guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 play-services-mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
+firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 
 
 

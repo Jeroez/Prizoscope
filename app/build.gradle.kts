@@ -17,7 +17,7 @@ val localProperties = Properties().apply {
     }
 }
 
-val googleApiKey: String = localProperties.getProperty("GOOGLE_CLOUD_VISION_API_KEY") ?: ""
+val googleApiKey: String = localProperties.getProperty("AIzaSyDjZO0xzAtcgJFATO7Wq-h9exVKMFMwzE4") ?: ""
 
 android {
     namespace = "com.example.prizoscope"
@@ -31,17 +31,18 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GOOGLE_CLOUD_VISION_API_KEY", "\"AIzaSyDjZO0xzAtcgJFATO7Wq-h9exVKMFMwzE4\"")
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
-            buildConfigField("String", "GOOGLE_CLOUD_VISION_API_KEY", "\"$googleApiKey\"")
+            buildConfigField(type = "String", name = "GOOGLE_CLOUD_VISION_API_KEY", value = "\"$googleApiKey\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "GOOGLE_CLOUD_VISION_API_KEY", "\"$googleApiKey\"")
+            buildConfigField(type = "String", name = "GOOGLE_CLOUD_VISION_API_KEY", value = "\"$googleApiKey\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -78,6 +79,7 @@ dependencies {
     implementation(libs.play.services.mlkit.text.recognition)
     implementation(libs.play.services.location)
     implementation(libs.volley)
+    implementation(libs.firebase.storage.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

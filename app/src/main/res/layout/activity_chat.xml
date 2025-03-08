@@ -62,7 +62,7 @@
                 android:id="@+id/btn_attach"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:contentDescription="@string/attach_file"
+                android:contentDescription="@string/album"
                 android:padding="8dp"
                 android:src="@drawable/album" />
 
