@@ -114,14 +114,13 @@ class ChatActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.currentAdminText).text = currentAdmin
     }
     private fun checkAndRequestStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // SDK 34+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
             requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 100)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // SDK 33 (Android 13)
-            requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 100)
-        } else { // Older Android versions
+        } else {
             requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 100)
         }
     }
+
 
     // Call this function whenever admin is changed
     private fun onAdminSelected(admin: String) {
@@ -254,57 +253,87 @@ class ChatActivity : AppCompatActivity() {
                 Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
             }
     }
+    fun getWebhookUrl(callback: (String?) -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+        val docRef = db.collection("settings").document("discord")
 
-    private fun uploadImageToDiscord(uri: Uri) {
-        val discordWebhookUrl = "https://discord.com/api/webhooks/1346122904760352898/OBw8Uft9dyDyw0XJU2vP89Qk0-_1NRJJctF3QwmSKUfSyt-6h8sB454q0DjseneLHF9-" //  webhook URL
-
-        // Convert Uri to File
-        val file = File(getRealPathFromURI(uri)!!)
-        if (!file.exists()) {
-            Log.e("DiscordUpload", "File does not exist: ${file.path}")
-            Toast.makeText(this, "File error: Image not found", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("file", file.name, file.asRequestBody("image/jpeg".toMediaTypeOrNull()))
-            .build()
-
-        val request = Request.Builder()
-            .url(discordWebhookUrl)
-            .post(requestBody)
-            .build()
-
-        val client = OkHttpClient()
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("DiscordUpload", "Upload failed: ${e.message}")
-                runOnUiThread {
-                    Toast.makeText(this@ChatActivity, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        docRef.get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    val webhookUrl = document.getString("webhook_url")
+                    callback(webhookUrl)  // Return webhook URL
+                } else {
+                    callback(null)  // No URL found
                 }
             }
-
-            override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body?.string()
-                Log.d("DiscordUpload", "Response: $responseBody")
-
-                try {
-                    val jsonResponse = JSONObject(responseBody ?: "{}")
-                    val imageUrl = jsonResponse.getJSONArray("attachments").getJSONObject(0).getString("url")
-
-                    runOnUiThread {
-                        sendMessage(imageUrl, isImage = true)  // ✅ Send URL in chat
-                    }
-                } catch (e: Exception) {
-                    Log.e("DiscordUpload", "Error parsing response: ${e.message}")
-                    runOnUiThread {
-                        Toast.makeText(this@ChatActivity, "Upload failed", Toast.LENGTH_SHORT).show()
-                    }
-                }
+            .addOnFailureListener { e ->
+                callback(null)  // Error fetching data
             }
-        })
     }
+    private fun uploadImageToDiscord(uri: Uri) {
+        getWebhookUrl { webhookUrl ->
+            if (webhookUrl == null) {
+                Log.e("DiscordUpload", "Webhook URL not found")
+                Toast.makeText(this, "Webhook URL error", Toast.LENGTH_SHORT).show()
+                return@getWebhookUrl
+            }
+
+            val filePath = getRealPathFromURI(uri)
+            if (filePath == null) {
+                Log.e("DiscordUpload", "Failed to get file path")
+                Toast.makeText(this, "Error: Cannot access file", Toast.LENGTH_SHORT).show()
+                return@getWebhookUrl
+            }
+
+            val file = File(filePath)
+            if (!file.exists() || !file.canRead()) {
+                Log.e("DiscordUpload", "File does not exist or cannot be read: ${file.path}")
+                Toast.makeText(this, "File error: Image not found or unreadable", Toast.LENGTH_SHORT).show()
+                return@getWebhookUrl
+            }
+
+
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", file.name, file.asRequestBody("image/jpeg".toMediaTypeOrNull()))
+                .build()
+
+            val request = Request.Builder()
+                .url(webhookUrl)
+                .post(requestBody)
+                .build()
+
+            OkHttpClient().newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.e("DiscordUpload", "Upload failed: ${e.message}")
+                    runOnUiThread {
+                        Toast.makeText(this@ChatActivity, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val responseBody = response.body?.string()
+                    Log.d("DiscordUpload", "Response: $responseBody")
+
+                    try {
+                        val jsonResponse = JSONObject(responseBody ?: "{}")
+                        val imageUrl = jsonResponse.getJSONArray("attachments").getJSONObject(0).getString("url")
+
+                        runOnUiThread {
+                            sendMessage(imageUrl, isImage = true)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DiscordUpload", "Error parsing response: ${e.message}")
+                        runOnUiThread {
+                            Toast.makeText(this@ChatActivity, "Upload failed", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            })
+        }
+    }
+
+
 
     private fun getRealPathFromURI(uri: Uri): String? {
         val projection = arrayOf(MediaStore.Images.Media.DATA)
