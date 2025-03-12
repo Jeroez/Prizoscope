@@ -31,8 +31,6 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.common.FileUtil
 import java.io.ByteArrayOutputStream
 import com.example.prizoscope.api.RetrofitClient
 import com.example.prizoscope.api.ObjectDetectionResponse
@@ -55,7 +53,6 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var handler: Handler
     private lateinit var firestore: FirebaseFirestore
     private lateinit var labels: List<String>
-    private lateinit var interpreter: Interpreter
     private val paint = Paint()
     private val TAG = "CameraActivity"
     private var lastScanTime = System.currentTimeMillis()
@@ -67,9 +64,7 @@ class CameraActivity : AppCompatActivity() {
         textureView = findViewById(R.id.textureView)
         firestore = FirebaseFirestore.getInstance()
 
-        labels = FileUtil.loadLabels(this, "labels.txt")
-        val model = FileUtil.loadMappedFile(this, "model.tflite")
-        interpreter = Interpreter(model)
+
 
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         setupBottomNav()
@@ -111,12 +106,11 @@ class CameraActivity : AppCompatActivity() {
                 return
             }
 
-            if (!::textureView.isInitialized || textureView.surfaceTexture == null) {
-                Log.e(TAG, "TextureView is not initialized or its SurfaceTexture is null.")
+            val surfaceTexture = textureView.surfaceTexture ?: run {
+                Log.e(TAG, "TextureView is not initialized properly.")
                 return
             }
 
-            val surfaceTexture = textureView.surfaceTexture!!
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
             val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                 ?.getOutputSizes(SurfaceTexture::class.java)
@@ -127,7 +121,7 @@ class CameraActivity : AppCompatActivity() {
 
             cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(camera: CameraDevice) {
-                    cameraDevice = camera // Ensure cameraDevice is assigned before use
+                    cameraDevice = camera
 
                     try {
                         val captureRequest = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
@@ -143,12 +137,14 @@ class CameraActivity : AppCompatActivity() {
 
                                 override fun onConfigureFailed(session: CameraCaptureSession) {
                                     Log.e(TAG, "Camera capture session configuration failed.")
+                                    cameraDevice.close() // ✅ Close camera device on failure
                                 }
                             },
                             handler
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error creating capture session: ${e.message}")
+                        cameraDevice.close() // ✅ Close camera device on error
                     }
                 }
 
@@ -168,6 +164,7 @@ class CameraActivity : AppCompatActivity() {
             Toast.makeText(this, "Error opening camera: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
 
 
 
@@ -210,61 +207,59 @@ class CameraActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in processFrame: ${e.message}")
-            Toast.makeText(this, "Error processing frame: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
-            bitmap.recycle() // Recycle the bitmap to free memory
+            if (!bitmap.isRecycled) {
+                bitmap.recycle() // ✅ Avoid memory leaks
+            }
         }
     }
+
 
     private var lastDetectedObject: String? = null
 
     private fun processObjectDetection(bitmap: Bitmap) {
         try {
-            // Convert bitmap to byte array
             val byteArrayOutputStream = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
             val byteArray = byteArrayOutputStream.toByteArray()
 
-            // Create a file from the byte array
-            val file = File.createTempFile("image", ".jpg", cacheDir)
-            file.writeBytes(byteArray)
+            val file = File.createTempFile("image", ".jpg", cacheDir).apply { writeBytes(byteArray) }
 
-            // Create a MultipartBody.Part
-            val requestFile = RequestBody.create("image/jpeg".toMediaTypeOrNull(), file)
+            // ✅ Fix deprecated method
+            val requestFile = byteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
             val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
 
-            // Send the image to the API
             RetrofitClient.instance.detectObjects(body).enqueue(object : Callback<ObjectDetectionResponse> {
                 override fun onResponse(call: Call<ObjectDetectionResponse>, response: Response<ObjectDetectionResponse>) {
                     if (response.isSuccessful) {
                         val detectedObjects = response.body()?.objects
                         if (!detectedObjects.isNullOrEmpty()) {
                             val bestMatch = detectedObjects.maxByOrNull { it.confidence }
+
                             if (bestMatch != null && bestMatch.confidence > 0.7) {
-                                Log.d(TAG, "Detected object: ${bestMatch.label} with confidence ${bestMatch.confidence}")
-                                redirectToShopping(bestMatch.label)
+                                // ✅ Prevent redundant detections
+                                if (bestMatch.label != lastDetectedObject) {
+                                    lastDetectedObject = bestMatch.label
+                                    Log.d(TAG, "Detected object: ${bestMatch.label} with confidence ${bestMatch.confidence}")
+                                    redirectToShopping(bestMatch.label)
+                                }
                             } else {
-                                Log.w(TAG, "Low confidence. Falling back to OCR.")
-                                Toast.makeText(this@CameraActivity, "Low confidence. Trying text recognition.", Toast.LENGTH_SHORT).show()
+                                Log.w(TAG, "Low confidence. Trying text recognition.")
                             }
                         } else {
                             Log.w(TAG, "No objects detected.")
-                            Toast.makeText(this@CameraActivity, "No objects detected.", Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         Log.e(TAG, "API call failed: ${response.errorBody()?.string()}")
-                        Toast.makeText(this@CameraActivity, "API call failed.", Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onFailure(call: Call<ObjectDetectionResponse>, t: Throwable) {
                     Log.e(TAG, "API call failed: ${t.message}")
-                    Toast.makeText(this@CameraActivity, "API call failed: ${t.message}", Toast.LENGTH_SHORT).show()
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Error in processObjectDetection: ${e.message}")
-            Toast.makeText(this, "Error processing image: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -383,7 +378,6 @@ class CameraActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        interpreter.close()
     }
 
     private fun setupBottomNav() {
@@ -418,4 +412,23 @@ class CameraActivity : AppCompatActivity() {
         startActivity(Intent(this, activityClass))
         finish()
     }
+    class ShoppingActivity : AppCompatActivity() {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_shopping)
+
+            val searchTerm = intent.getStringExtra("search_term") ?: ""
+
+            if (searchTerm.isNotEmpty()) {
+                Log.d("ShoppingActivity", "Searching for: $searchTerm")
+                searchForItem(searchTerm) // Call your search function
+            }
+        }
+
+        private fun searchForItem(query: String) {
+            // Implement this function to fetch and display products
+            Toast.makeText(this, "Searching for $query", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 }
