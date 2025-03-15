@@ -59,35 +59,67 @@ class ItemDetailActivity : AppCompatActivity() {
         binding.itemRating.rating = currentItem.rating ?: 5f
 
         binding.purchaseButton.setOnClickListener {
-            val storeName = currentItem.store
-            if (storeName.isNullOrEmpty()) {
-                Toast.makeText(this, "Error: Store not found.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            val itemName = currentItem.name // Use item name instead of ID
 
-            // Send image URL to Firestore
-            val username = getSharedPreferences("user_session", MODE_PRIVATE)
-                .getString("username", "") ?: ""
-            val chatId = "$username | $storeName"
+            // 1. Fetch the item document from Firestore
+            firestore.collection("items")
+                .whereEqualTo("name", itemName)
+                .get()
+                .addOnSuccessListener { querySnapshot ->
+                    if (querySnapshot.isEmpty) {
+                        Toast.makeText(this, "Item not found in database", Toast.LENGTH_SHORT).show()
+                        return@addOnSuccessListener
+                    }
 
-            firestore.collection("chats").document(chatId).get().addOnSuccessListener { doc ->
-                val nextMsgNum = (doc.data?.size ?: 0).toLong()
-                val messageData = hashMapOf(
-                    "content" to currentItem.img_url,
-                    "sender" to "system",
-                    "timestamp" to System.currentTimeMillis(),
-                    "type" to "image"
-                )
-                firestore.collection("chats").document(chatId)
-                    .update("message_$nextMsgNum", messageData)
-            }
+                    val document = querySnapshot.documents[0]
+                    val storeName = document.getString("Store") ?: run {
+                        Toast.makeText(this, "Store not assigned to this item", Toast.LENGTH_SHORT).show()
+                        return@addOnSuccessListener
+                    }
 
-            // Open ChatActivity
-            val intent = Intent(this, ChatActivity::class.java).apply {
-                putExtra("admin_name", storeName)
-                putExtra("from_shopping", true)
-            }
-            startActivity(intent)
+                    // 2. Verify store exists in admins
+                    firestore.collection("admins").document(storeName)
+                        .get()
+                        .addOnSuccessListener { adminDoc ->
+                            if (!adminDoc.exists()) {
+                                Toast.makeText(this, "Store admin does not exist", Toast.LENGTH_SHORT).show()
+                                return@addOnSuccessListener
+                            }
+
+                            // 3. Get/Create chat document
+                            val username = getSharedPreferences("user_session", MODE_PRIVATE)
+                                .getString("username", "") ?: ""
+                            val chatId = "$username | $storeName"
+
+                            // 4. Add message to chat (new or existing)
+                            val messageData = hashMapOf(
+                                "content" to currentItem.img_url,
+                                "sender" to "user",
+                                "timestamp" to System.currentTimeMillis(),
+                                "type" to "image"
+                            )
+
+                            // Update or create chat document atomically
+                            firestore.collection("chats").document(chatId)
+                                .update("message_${System.currentTimeMillis()}", messageData)
+                                .addOnFailureListener {
+                                    // Create new chat if document doesn't exist
+                                    firestore.collection("chats").document(chatId)
+                                        .set(hashMapOf("message_0" to messageData))
+                                }
+
+                            // 5. Open ChatActivity
+                            Intent(this, ChatActivity::class.java).apply {
+                                putExtra("admin_name", storeName)
+                                putExtra("chat_id", chatId)
+                                startActivity(this)
+                            }
+                        }
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Error fetching item details", Toast.LENGTH_SHORT).show()
+                    Log.e("Firestore", "Item lookup failed", e)
+                }
         }
 
         binding.bookmarkButton.setOnClickListener {
