@@ -1,30 +1,33 @@
 package com.example.prizoscope.api
 
-import okhttp3.Interceptor
+import android.util.Log
+import com.example.prizoscope.BuildConfig
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import com.example.prizoscope.BuildConfig
-object RetrofitClient {
-    private const val BASE_URL = "https://vision.googleapis.com/v1/" // ✅ Fixed Base URL
 
-    // ✅ Automatically attach API Key to every request
+object RetrofitClient {
+    private const val BASE_URL = "https://vision.googleapis.com/v1/"  // ✅ Correct Base URL
+
+    private val apiKey = BuildConfig.GOOGLE_CLOUD_VISION_API_KEY  // ✅ Ensure this is correctly loaded
+
     private val httpClient = OkHttpClient.Builder()
-        .addInterceptor(Interceptor { chain ->
+        .addInterceptor { chain ->
             val original = chain.request()
-            val urlWithKey = original.url.newBuilder()
-                .addQueryParameter("key", BuildConfig.GOOGLE_CLOUD_VISION_API_KEY) // ✅ Fix here
+            val newUrl = original.url.newBuilder()
+                .addQueryParameter("key", apiKey)  // ✅ Fix API key injection
                 .build()
-            val requestWithKey = original.newBuilder().url(urlWithKey).build()
-            chain.proceed(requestWithKey)
-        })
+            val newRequest = original.newBuilder().url(newUrl).build()
+            Log.d("RetrofitClient", "Final API URL: ${newUrl}")  // ✅ Log full API request
+            chain.proceed(newRequest)
+        }
         .build()
 
     val instance: ObjectDetectionApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
-            .client(httpClient) // ✅ Automatically adds API Key
+            .client(httpClient)
             .build()
             .create(ObjectDetectionApiService::class.java)
     }
